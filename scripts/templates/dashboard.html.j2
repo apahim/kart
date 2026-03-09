@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Race Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>
+    <style>
+        body { background-color: #f8f9fa; }
+        .card { margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #2c3e50; }
+        .stat-label { font-size: 0.85rem; color: #7f8c8d; text-transform: uppercase; }
+        .section-title { border-left: 4px solid #3498db; padding-left: 12px; margin: 2rem 0 1rem; }
+        .metadata-badge { font-size: 0.9rem; }
+        .section-desc { color: #6c757d; margin-bottom: 1rem; }
+
+        .sector-best { background-color: rgba(46,204,113,0.3) !important; --bs-table-bg-state: rgba(46,204,113,0.3); }
+        .sector-slow { background-color: rgba(231,76,60,0.2) !important; --bs-table-bg-state: rgba(231,76,60,0.2); }
+
+        .action-plan .action-item { padding: 0.75rem 1rem; border-bottom: 1px solid #e9ecef; }
+        .action-plan .action-item:last-child { border-bottom: none; }
+        .action-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; margin-right: 0.75rem; font-size: 0.85rem; flex-shrink: 0; }
+        .action-icon.target { background-color: #e74c3c; color: white; }
+        .action-icon.consistency { background-color: #f39c12; color: white; }
+        .action-icon.trending-up { background-color: #2ecc71; color: white; }
+        .action-icon.trending-down { background-color: #e67e22; color: white; }
+        .action-icon.zap { background-color: #9b59b6; color: white; }
+        .action-icon.brake { background-color: #e74c3c; color: white; }
+        .action-icon.check { background-color: #2ecc71; color: white; }
+
+        @media (max-width: 576px) {
+            .stat-value { font-size: 1.3rem; }
+            .stat-label { font-size: 0.7rem; }
+            .section-title { font-size: 1.1rem; }
+            .section-desc { font-size: 0.8rem; }
+            .card.text-center.p-3 { padding: 0.75rem !important; }
+            .card.p-2 { padding: 0.5rem !important; }
+            .metadata-badge { font-size: 0.75rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>{{ title }}</h1>
+            <p class="text-muted">
+                {% if metadata.date %}{{ metadata.date }}{% endif %}
+                {% if metadata.track %} &mdash; {{ metadata.track }}{% endif %}
+            </p>
+            {% if metadata %}
+            <div class="d-flex gap-2 flex-wrap">
+                {% if metadata.kart_number %}
+                <span class="badge bg-primary metadata-badge">Kart #{{ metadata.kart_number }}</span>
+                {% endif %}
+                {% if metadata.driver_weight_kg %}
+                <span class="badge bg-secondary metadata-badge">{{ metadata.driver_weight_kg }} kg</span>
+                {% endif %}
+                {% if metadata.session_type %}
+                <span class="badge bg-warning text-dark metadata-badge">{{ metadata.session_type }}</span>
+                {% endif %}
+                {% if summary.weather %}
+                <span class="badge bg-info metadata-badge">{{ summary.weather.condition | default('') }} {{ summary.weather.temp_c | default('') }}&deg;C</span>
+                {% if summary.weather.wind_kmh %}
+                <span class="badge bg-info metadata-badge">Wind: {{ summary.weather.wind_direction | default('') }} {{ summary.weather.wind_kmh }} km/h</span>
+                {% endif %}
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Section 1: Session Overview -->
+    <h3 class="section-title">Session Overview</h3>
+
+    <div class="row">
+        <div class="col-md-3 col-sm-6 col-6">
+            <div class="card text-center p-3">
+                <div class="stat-value">{{ summary.best_lap_time_fmt | default(summary.best_lap.time) }}</div>
+                <div class="stat-label">Best Lap (L{{ summary.best_lap.lap }})</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 col-6">
+            <div class="card text-center p-3">
+                <div class="stat-value">{{ summary.average_fmt | default(summary.average) }}</div>
+                <div class="stat-label">Average</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 col-6">
+            <div class="card text-center p-3">
+                <div class="stat-value">{{ summary.consistency_pct }}%</div>
+                <div class="stat-label">Consistency</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 col-6">
+            <div class="card text-center p-3">
+                <div class="stat-value">{{ summary.total_laps }}</div>
+                <div class="stat-label">Total Laps</div>
+            </div>
+        </div>
+    </div>
+
+    {% if summary.excluded_laps %}
+    <div class="alert alert-warning mt-2">
+        <strong>Excluded laps (IQR outliers):</strong>
+        {% for e in summary.excluded_laps %}
+        Lap {{ e.lap }} ({{ e.time }}s — {{ e.reason }}){% if not loop.last %}, {% endif %}
+        {% endfor %}
+        <br><small class="text-muted">These laps are excluded from the average, consistency, and coaching calculations but still appear in all charts and tables.</small>
+    </div>
+    {% endif %}
+
+    {% if coaching and coaching.action_items %}
+    <div class="card border-primary action-plan">
+        <div class="card-header bg-primary text-white"><strong>Your Action Plan</strong></div>
+        <div class="card-body p-0">
+            {% for item in coaching.action_items %}
+            <div class="action-item d-flex align-items-start">
+                <span class="action-icon {{ item.icon }}">
+                    {% if item.icon == 'target' %}&#9678;{% elif item.icon == 'consistency' %}&#8651;{% elif item.icon == 'trending-up' %}&#9650;{% elif item.icon == 'trending-down' %}&#9660;{% elif item.icon == 'zap' %}&#9889;{% elif item.icon == 'brake' %}&#9632;{% elif item.icon == 'check' %}&#10003;{% endif %}
+                </span>
+                <div>
+                    <strong>{{ item.title }}</strong><br>
+                    <span class="text-muted">{{ item.detail }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">{{ charts.laptime_bar | safe }}</div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">{{ charts.delta_to_best | safe }}</div>
+        </div>
+    </div>
+
+    <!-- Section 2: Best Lap Deep Dive -->
+    {% if charts.cumulative_delta or charts.throttle_brake_phases or charts.speed_track_map or charts.braking_map %}
+    <h3 class="section-title">Best Lap Deep Dive</h3>
+    <p class="section-desc">The track maps show speed and braking zones around the circuit. The green area in the delta trace shows where your best lap gained time vs the median. The throttle/brake phases show your inputs.</p>
+    {% if charts.speed_track_map or charts.braking_map %}
+    <div class="row">
+        {% if charts.speed_track_map %}
+        <div class="col-md-6">
+            <div class="card p-2">{{ charts.speed_track_map | safe }}</div>
+        </div>
+        {% endif %}
+        {% if charts.braking_map %}
+        <div class="col-md-6">
+            <div class="card p-2">{{ charts.braking_map | safe }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if charts.cumulative_delta %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">{{ charts.cumulative_delta | safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if charts.throttle_brake_phases %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">{{ charts.throttle_brake_phases | safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Section 3: Where to Improve -->
+    {% if sector_data or charts.corner_time_loss or charts.braking_consistency %}
+    <h3 class="section-title">Where to Improve</h3>
+    <p class="section-desc">The corner time loss chart ranks which corners cost you the most. Wide braking boxes mean inconsistent braking — an easy area to improve. Sector times show where within a lap you can gain time.</p>
+
+    {% if charts.corner_time_loss %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">{{ charts.corner_time_loss | safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if charts.braking_consistency %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">{{ charts.braking_consistency | safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if sector_data %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">
+                <h6 class="card-title text-center mb-2">Sector Times</h6>
+                <div class="table-responsive">
+                <table class="table table-sm table-hover text-center mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Lap</th>
+                            {% for h in sector_data.headers %}<th>{{ h }}</th>{% endfor %}
+                            <th>Total</th>
+                            <th>Delta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in sector_data.rows %}
+                        <tr{% if row.is_best %} class="fw-bold"{% endif %}>
+                            <td>L{{ row.lap }}</td>
+                            {% for s in row.sectors %}
+                            <td class="{{ s.css_class }}">{{ s.value }}</td>
+                            {% endfor %}
+                            <td>{{ row.total }}</td>
+                            <td>{{ row.delta }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="table-success fw-bold">
+                            <td>Ideal</td>
+                            {% for s in sector_data.theoretical_row.sectors %}
+                            <td>{{ s.value }}</td>
+                            {% endfor %}
+                            <td>{{ sector_data.theoretical_row.total }}</td>
+                            <td>-</td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <footer class="text-center text-muted py-4">
+        <small>Generated {{ summary.generated }}</small>
+    </footer>
+</div>
+</body>
+</html>

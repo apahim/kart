@@ -1,0 +1,7 @@
+pandas
+matplotlib
+plotly
+scipy
+jinja2
+pyyaml
+pytest

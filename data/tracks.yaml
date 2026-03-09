@@ -1,0 +1,12 @@
+kiltorcan_raceway:
+  name: Kiltorcan Raceway
+  lat: 52.5436
+  lon: -7.3656
+  timezone: Europe/Dublin
+  corners:
+    - {name: T1, lat: 52.46228, lon: -7.18163}
+    - {name: T2, lat: 52.46310, lon: -7.18208}
+    - {name: T3, lat: 52.46325, lon: -7.18278}
+    - {name: T4, lat: 52.46400, lon: -7.18190}
+    - {name: T5, lat: 52.46383, lon: -7.18223}
+    - {name: T6, lat: 52.46420, lon: -7.18148}

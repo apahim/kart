@@ -1,0 +1,32 @@
+generated: '2026-03-10T12:42:44'
+total_laps: 24
+clean_laps: 23
+excluded_laps:
+- lap: 11
+  time: 72.802
+  reason: IQR outlier (>72.598s)
+best_lap:
+  lap: 16
+  time: 70.033
+worst_clean_lap:
+  lap: 23
+  time: 72.159
+average: 70.86
+median: 70.75
+std_dev: 0.53
+consistency_pct: 99.3
+best_lap_time_fmt: '1:10.033'
+worst_clean_time_fmt: '1:12.159'
+average_fmt: '1:10.855'
+median_fmt: '1:10.755'
+top_speed_kmh: 59.7
+max_lateral_g: 1.34
+max_braking_g: 0.57
+max_acceleration_g: 0.18
+weather:
+  condition: Overcast
+  temp_c: 8.8
+  wind_kmh: 20.4
+  wind_direction_deg: 348
+  wind_direction: N
+  weathercode: 3
