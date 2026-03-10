@@ -10,8 +10,6 @@
         body { background-color: #f8f9fa; }
         .card { margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .section-title { border-left: 4px solid #e74c3c; padding-left: 12px; margin: 2rem 0 1rem; }
-        #raceSelector { max-height: 200px; overflow-y: auto; }
-
         @media (max-width: 576px) {
             .section-title { font-size: 1.1rem; }
             .card.p-2 { padding: 0.5rem !important; }
@@ -42,10 +40,6 @@
                     <select id="sessionTypeFilter" class="form-select form-select-sm" style="width: auto;">
                     </select>
                 </div>
-                <div>
-                    <label class="form-label fw-bold">Sessions:</label>
-                    <div id="raceSelector" class="d-flex gap-3 flex-wrap"></div>
-                </div>
             </div>
         </div>
     </div>
@@ -57,6 +51,7 @@
             <table class="table table-striped table-hover mb-0">
                 <thead class="table-dark">
                     <tr>
+                        <th style="width: 2rem;"></th>
                         <th>Date</th>
                         <th>Track</th>
                         <th>Type</th>
@@ -74,7 +69,8 @@
                 </thead>
                 <tbody>
                     {% for race in races %}
-                    <tr data-session-type="{{ race.session_type | default('') }}" data-track="{{ race.track }}">
+                    <tr data-session-type="{{ race.session_type | default('') }}" data-track="{{ race.track }}" data-date="{{ race.date.strftime('%Y-%m-%d') if race.date is not none else '' }}">
+                        <td><input type="checkbox" class="form-check-input race-check" value="{{ race.date.strftime('%Y-%m-%d') if race.date is not none else '' }}" checked></td>
                         <td>{{ race.date.strftime('%Y-%m-%d') if race.date is not none else '' }}</td>
                         <td>{{ race.track }}</td>
                         <td>{{ race.session_type | default('—', true) }}</td>
@@ -204,26 +200,6 @@ function populateSessionTypes() {
     }
 }
 
-function populateRaceCheckboxes() {
-    var track = getSelectedTrack();
-    var stype = getSelectedType();
-    var container = document.getElementById('raceSelector');
-    container.innerHTML = '';
-    var races = (raceList[track] || {})[stype] || [];
-    races.forEach(function(race) {
-        var div = document.createElement('div');
-        div.className = 'form-check form-check-inline';
-        var id = 'race-' + race.date.replace(/[^a-z0-9]/gi, '');
-        div.innerHTML = '<input class="form-check-input race-check" type="checkbox" id="' + id +
-                         '" value="' + race.date + '" checked>' +
-                         '<label class="form-check-label" for="' + id + '">' + race.label + '</label>';
-        container.appendChild(div);
-    });
-    container.querySelectorAll('.race-check').forEach(function(cb) {
-        cb.addEventListener('change', applyRaceFilter);
-    });
-}
-
 function applyChartFilter() {
     var track = getSelectedTrack();
     var stype = getSelectedType();
@@ -235,12 +211,15 @@ function applyChartFilter() {
         div.style.display = match ? 'block' : 'none';
     });
 
-    // Filter table rows
+    // Filter table rows and sync checkboxes
     document.querySelectorAll('tr[data-track]').forEach(function(row) {
         var trackMatch = row.getAttribute('data-track') === track;
         var typeMatch = stype === 'All' || !row.getAttribute('data-session-type') ||
                         row.getAttribute('data-session-type') === stype;
-        row.style.display = (trackMatch && typeMatch) ? '' : 'none';
+        var visible = trackMatch && typeMatch;
+        row.style.display = visible ? '' : 'none';
+        var cb = row.querySelector('.race-check');
+        if (cb) cb.checked = visible;
     });
 }
 
@@ -277,7 +256,7 @@ function applyRaceFilter() {
 
 function applyFilters() {
     applyChartFilter();
-    populateRaceCheckboxes();
+    applyRaceFilter();
 }
 
 document.getElementById('trackFilter').addEventListener('change', function() {
@@ -285,6 +264,11 @@ document.getElementById('trackFilter').addEventListener('change', function() {
     applyFilters();
 });
 document.getElementById('sessionTypeFilter').addEventListener('change', applyFilters);
+
+// Attach checkbox change events (checkboxes are static in the DOM)
+document.querySelectorAll('.race-check').forEach(function(cb) {
+    cb.addEventListener('change', applyRaceFilter);
+});
 
 // Initial setup
 populateSessionTypes();
