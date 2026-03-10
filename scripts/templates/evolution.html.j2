@@ -138,12 +138,6 @@
         <div class="card p-2">{{ charts.speed_gforce_trends | safe }}</div>
         {% endif %}
 
-        {% if charts.kart_comparison %}
-        <h3 class="section-title">Kart Comparison</h3>
-        <p class="text-muted ms-3">Best lap times grouped by kart number — compare chassis performance across sessions.</p>
-        <div class="card p-2">{{ charts.kart_comparison | safe }}</div>
-        {% endif %}
-
         {% if charts.weather_impact %}
         <h3 class="section-title">Weather Impact</h3>
         <p class="text-muted ms-3">Best lap times coloured by weather condition, with ambient temperature overlay. Wet or cold conditions typically add 1–3 seconds. Compare same-condition sessions for true progress.</p>

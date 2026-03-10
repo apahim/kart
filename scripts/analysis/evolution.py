@@ -441,38 +441,6 @@ def create_improvement_summary(races_df):
     return fig
 
 
-def create_kart_comparison(races_df):
-    """Box plots of lap times grouped by kart number."""
-    df = races_df.dropna(subset=["kart_number"])
-    if df.empty:
-        return None
-
-    fig = go.Figure()
-    for kart in sorted(df["kart_number"].unique()):
-        kart_data = df[df["kart_number"] == kart]
-        date_labels = [d.strftime("%Y-%m-%d") if pd.notna(d) else "" for d in kart_data["date"]]
-        fig.add_trace(go.Box(
-            y=kart_data["best_lap_time"],
-            name=f"Kart {int(kart)}",
-            boxpoints="all",
-            jitter=0.3,
-            pointpos=-1.8,
-            text=date_labels,
-            hovertemplate="Kart %{x}<br>Best Lap: %{y:.3f}s<br>%{text}<extra></extra>",
-        ))
-
-    subtitle = ""
-    if df["kart_number"].nunique() == 1:
-        subtitle = " (single kart — more data needed for comparison)"
-
-    fig.update_layout(
-        title=f"Kart Comparison (Best Lap Times){subtitle}",
-        yaxis_title="Best Lap Time (s)",
-        template="plotly_white", height=400,
-    )
-    return fig
-
-
 def create_weather_impact(races_df):
     """Performance metrics split by weather condition with temperature on secondary axis."""
     df = races_df.dropna(subset=["weather_condition"])
