@@ -538,10 +538,12 @@ def create_weight_vs_performance(races_df):
     avg_df = df.dropna(subset=["average"])
     if not avg_df.empty:
         avg_context = [_context_hover(row) for _, row in avg_df.iterrows()]
+        avg_date_labels = [d.strftime("%Y-%m-%d") if pd.notna(d) else "" for d in avg_df["date"]]
         fig.add_trace(go.Scatter(
             x=avg_df["driver_weight_kg"], y=avg_df["average"],
             mode="markers", name="Average",
             marker=dict(size=10, color="#3498db", symbol="diamond"),
+            text=avg_date_labels,
             customdata=avg_context,
             hovertemplate="Weight: %{x}kg<br>Avg: %{y:.3f}s<br>%{customdata}<extra></extra>",
         ))
@@ -576,10 +578,12 @@ def create_temp_vs_laptime(races_df):
     avg_df = df.dropna(subset=["average"])
     if not avg_df.empty:
         avg_context = [_context_hover(row) for _, row in avg_df.iterrows()]
+        avg_date_labels = [d.strftime("%Y-%m-%d") if pd.notna(d) else "" for d in avg_df["date"]]
         fig.add_trace(go.Scatter(
             x=avg_df["weather_temp_c"], y=avg_df["average"],
             mode="markers", name="Average",
             marker=dict(size=10, color="#3498db", symbol="diamond"),
+            text=avg_date_labels,
             customdata=avg_context,
             hovertemplate="Temp: %{x}°C<br>Avg: %{y:.3f}s<br>%{customdata}<extra></extra>",
         ))
