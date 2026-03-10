@@ -126,6 +126,9 @@ def compute_sector_times(df, laptimes_df, sector_boundaries, time_col="seconds")
     best_lap = int(clean_df.loc[clean_df[time_col].idxmin(), "lap"])
     all_laps = sorted(laptimes_df["lap"].astype(int))
 
+    # Build lookup of actual lap times for proportional scaling
+    lap_time_lookup = dict(zip(laptimes_df["lap"].astype(int), laptimes_df[time_col]))
+
     n_sectors = len(sector_boundaries) - 1
     sector_times = {}
 
@@ -160,6 +163,12 @@ def compute_sector_times(df, laptimes_df, sector_boundaries, time_col="seconds")
             times.append(float(np.sum(dt)))
 
         if None not in times:
+            # Scale sector times so they sum to the actual lap time
+            raw_total = sum(times)
+            if raw_total > 0:
+                actual_time = lap_time_lookup.get(lap, raw_total)
+                factor = actual_time / raw_total
+                times = [t * factor for t in times]
             sector_times[lap] = times
 
     if not sector_times:
