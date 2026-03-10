@@ -142,19 +142,24 @@
     </div>
 
     <!-- Section 2: Best Lap Deep Dive -->
-    {% if charts.cumulative_delta or charts.throttle_brake_phases or charts.speed_track_map or charts.braking_map %}
+    {% if charts.cumulative_delta or charts.throttle_brake_phases or charts.speed_track_map or charts.braking_map or charts.sector_delta_map %}
     <h3 class="section-title">Best Lap Deep Dive</h3>
     <p class="section-desc">The track maps show speed and braking zones around the circuit. The green area in the delta trace shows where your best lap gained time vs the median. The throttle/brake phases show your inputs.</p>
-    {% if charts.speed_track_map or charts.braking_map %}
+    {% if charts.speed_track_map or charts.braking_map or charts.sector_delta_map %}
     <div class="row">
         {% if charts.speed_track_map %}
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card p-2">{{ charts.speed_track_map | safe }}</div>
         </div>
         {% endif %}
         {% if charts.braking_map %}
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card p-2">{{ charts.braking_map | safe }}</div>
+        </div>
+        {% endif %}
+        {% if charts.sector_delta_map %}
+        <div class="col-md-4">
+            <div class="card p-2">{{ charts.sector_delta_map | safe }}</div>
         </div>
         {% endif %}
     </div>
@@ -191,13 +196,6 @@
     <div class="row">
         <div class="col-12">
             <div class="card p-2">{{ charts.braking_consistency | safe }}</div>
-        </div>
-    </div>
-    {% endif %}
-    {% if charts.sector_delta_map %}
-    <div class="row">
-        <div class="col-12 mb-3">
-            <div class="card p-2">{{ charts.sector_delta_map | safe }}</div>
         </div>
     </div>
     {% endif %}
