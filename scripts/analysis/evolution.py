@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 
 from scripts.load_data import extract_laptimes_from_telemetry, load_telemetry
 from scripts.analysis.outliers import filter_non_race_laps, detect_outliers
-from scripts.analysis.utils import project_to_meters
+from scripts.analysis.utils import project_to_meters, format_laptime
 
 
 def load_all_races(data_dir="data/races"):
@@ -624,7 +624,9 @@ def create_raceline_evolution(races_df):
         clean_df, _ = detect_outliers(laps_df)
         if clean_df.empty:
             continue
-        best_lap = int(clean_df.loc[clean_df["seconds"].idxmin(), "lap"])
+        best_idx = clean_df["seconds"].idxmin()
+        best_lap = int(clean_df.loc[best_idx, "lap"])
+        best_time = float(clean_df.loc[best_idx, "seconds"])
 
         # Find GPS columns
         lat_col = lon_col = None
@@ -648,6 +650,7 @@ def create_raceline_evolution(races_df):
         label = date_str
         if row.get("session_type"):
             label += f" ({row['session_type']})"
+        label += f" - {format_laptime(best_time)}"
 
         color = colors[i % len(colors)]
         fig.add_trace(go.Scatter(

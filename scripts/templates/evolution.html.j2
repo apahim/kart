@@ -10,6 +10,7 @@
         body { background-color: #f8f9fa; }
         .card { margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .section-title { border-left: 4px solid #e74c3c; padding-left: 12px; margin: 2rem 0 1rem; }
+        #raceSelector { max-height: 200px; overflow-y: auto; }
 
         @media (max-width: 576px) {
             .section-title { font-size: 1.1rem; }
@@ -39,15 +40,11 @@
                 <div>
                     <label for="sessionTypeFilter" class="form-label fw-bold">Session Type:</label>
                     <select id="sessionTypeFilter" class="form-select form-select-sm" style="width: auto;">
-                        <option value="">All</option>
-                        {% set types = [] %}
-                        {% for race in races %}
-                            {% if race.session_type and race.session_type not in types %}
-                                {% if types.append(race.session_type) %}{% endif %}
-                                <option value="{{ race.session_type }}">{{ race.session_type }}</option>
-                            {% endif %}
-                        {% endfor %}
                     </select>
+                </div>
+                <div>
+                    <label class="form-label fw-bold">Sessions:</label>
+                    <div id="raceSelector" class="d-flex gap-3 flex-wrap"></div>
                 </div>
             </div>
         </div>
@@ -66,7 +63,7 @@
                         <th>Kart</th>
                         <th>Weight (kg)</th>
                         <th>Weather</th>
-                        <th>Temp (°C)</th>
+                        <th>Temp (&deg;C)</th>
                         <th>Wind (km/h)</th>
                         <th>Laps</th>
                         <th>Best Lap</th>
@@ -98,9 +95,10 @@
         </div>
     </div>
 
-    <!-- Per-track chart sections -->
-    {% for track, charts in per_track_charts.items() %}
-    <div class="track-charts" data-track="{{ track }}" style="display: {{ 'block' if track == default_track else 'none' }};">
+    <!-- Per-track, per-session-type chart sections -->
+    {% for track, type_dict in per_track_type_charts.items() %}
+    {% for stype, charts in type_dict.items() %}
+    <div class="track-charts" data-track="{{ track }}" data-stype="{{ stype }}" style="display: none;">
 
         {% if charts.lap_distribution %}
         <h3 class="section-title">Lap Time Distribution</h3>
@@ -170,33 +168,126 @@
 
     </div>
     {% endfor %}
+    {% endfor %}
 
     <footer class="text-center text-muted py-4">
         <small>Generated automatically from race summaries</small>
     </footer>
 </div>
 <script>
-function applyFilters() {
-    var selectedTrack = document.getElementById('trackFilter').value;
-    var selectedType = document.getElementById('sessionTypeFilter').value;
+var raceList = {{ race_list_json | safe }};
 
-    // Toggle chart sections by track
+function getSelectedTrack() {
+    return document.getElementById('trackFilter').value;
+}
+
+function getSelectedType() {
+    return document.getElementById('sessionTypeFilter').value;
+}
+
+function populateSessionTypes() {
+    var track = getSelectedTrack();
+    var sel = document.getElementById('sessionTypeFilter');
+    var types = Object.keys(raceList[track] || {});
+    var prev = sel.value;
+    sel.innerHTML = '';
+    types.forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        if (t === prev) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    // Default to "All" if previous selection not available
+    if (!sel.value || !types.includes(sel.value)) {
+        sel.value = 'All';
+    }
+}
+
+function populateRaceCheckboxes() {
+    var track = getSelectedTrack();
+    var stype = getSelectedType();
+    var container = document.getElementById('raceSelector');
+    container.innerHTML = '';
+    var races = (raceList[track] || {})[stype] || [];
+    races.forEach(function(race) {
+        var div = document.createElement('div');
+        div.className = 'form-check form-check-inline';
+        var id = 'race-' + race.date.replace(/[^a-z0-9]/gi, '');
+        div.innerHTML = '<input class="form-check-input race-check" type="checkbox" id="' + id +
+                         '" value="' + race.date + '" checked>' +
+                         '<label class="form-check-label" for="' + id + '">' + race.label + '</label>';
+        container.appendChild(div);
+    });
+    container.querySelectorAll('.race-check').forEach(function(cb) {
+        cb.addEventListener('change', applyRaceFilter);
+    });
+}
+
+function applyChartFilter() {
+    var track = getSelectedTrack();
+    var stype = getSelectedType();
+
+    // Toggle chart divs by track + session type
     document.querySelectorAll('.track-charts').forEach(function(div) {
-        div.style.display = div.getAttribute('data-track') === selectedTrack ? 'block' : 'none';
+        var match = div.getAttribute('data-track') === track &&
+                    div.getAttribute('data-stype') === stype;
+        div.style.display = match ? 'block' : 'none';
     });
 
-    // Filter table rows by track and session type
+    // Filter table rows
     document.querySelectorAll('tr[data-track]').forEach(function(row) {
-        var trackMatch = row.getAttribute('data-track') === selectedTrack;
-        var typeMatch = !selectedType || row.getAttribute('data-session-type') === selectedType;
+        var trackMatch = row.getAttribute('data-track') === track;
+        var typeMatch = stype === 'All' || !row.getAttribute('data-session-type') ||
+                        row.getAttribute('data-session-type') === stype;
         row.style.display = (trackMatch && typeMatch) ? '' : 'none';
     });
 }
 
-document.getElementById('trackFilter').addEventListener('change', applyFilters);
+function applyRaceFilter() {
+    var checkedDates = [];
+    document.querySelectorAll('.race-check:checked').forEach(function(cb) {
+        checkedDates.push(cb.value);
+    });
+    var allDates = [];
+    document.querySelectorAll('.race-check').forEach(function(cb) {
+        allDates.push(cb.value);
+    });
+
+    // Find visible chart section
+    var visible = document.querySelector('.track-charts[style*="display: block"]');
+    if (!visible) return;
+
+    // Toggle Plotly trace visibility based on selected races
+    visible.querySelectorAll('.js-plotly-plot').forEach(function(plotDiv) {
+        if (!plotDiv.data) return;
+        var updates = plotDiv.data.map(function(trace) {
+            if (!trace.name) return true;
+            // Check if this trace name contains any known race date
+            var isRaceTrace = allDates.some(function(d) { return trace.name.indexOf(d) !== -1; });
+            if (!isRaceTrace) return true; // non-race traces stay visible
+            return checkedDates.some(function(d) { return trace.name.indexOf(d) !== -1; });
+        });
+        // Restyle each trace individually
+        updates.forEach(function(vis, idx) {
+            Plotly.restyle(plotDiv, {visible: vis}, [idx]);
+        });
+    });
+}
+
+function applyFilters() {
+    applyChartFilter();
+    populateRaceCheckboxes();
+}
+
+document.getElementById('trackFilter').addEventListener('change', function() {
+    populateSessionTypes();
+    applyFilters();
+});
 document.getElementById('sessionTypeFilter').addEventListener('change', applyFilters);
 
-// Apply initial filter on load
+// Initial setup
+populateSessionTypes();
 applyFilters();
 </script>
 </body>

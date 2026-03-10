@@ -4,9 +4,11 @@ Usage:
     python scripts/generate_evolution.py
 """
 
+import json
 import os
 import sys
 
+import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -47,6 +49,18 @@ def build_charts(races_df, all_laps_df):
     }
 
 
+def _build_race_list(races_df):
+    """Build a list of race info dicts for the JS race selector."""
+    result = []
+    for _, row in races_df.iterrows():
+        date_str = row["date"].strftime("%Y-%m-%d") if pd.notna(row.get("date")) else ""
+        label = date_str
+        if row.get("session_type"):
+            label += f" ({row['session_type']})"
+        result.append({"date": date_str, "label": label})
+    return result
+
+
 def main():
     races_df = load_all_races()
 
@@ -61,14 +75,30 @@ def main():
         races_df = enrich_races_with_quartiles(races_df, all_laps_df)
         print(f"Loaded {len(all_laps_df)} individual laps across all races")
 
-    # Build charts per track
+    # Build charts per (track, session_type)
     tracks = sorted(races_df["track"].unique())
-    per_track_charts = {}
+    per_track_type_charts = {}
+    race_list = {}
+
     for track in tracks:
         track_races = races_df[races_df["track"] == track]
         track_laps = all_laps_df[all_laps_df["track"] == track] if not all_laps_df.empty else all_laps_df
-        per_track_charts[track] = build_charts(track_races, track_laps)
-        print(f"  Generated charts for {track} ({len(track_races)} session(s))")
+
+        per_track_type_charts[track] = {}
+        race_list[track] = {}
+
+        # "All" session types
+        per_track_type_charts[track]["All"] = build_charts(track_races, track_laps)
+        race_list[track]["All"] = _build_race_list(track_races)
+        print(f"  Generated charts for {track} / All ({len(track_races)} session(s))")
+
+        # Per session type
+        for stype in sorted(track_races["session_type"].dropna().unique()):
+            filtered_races = track_races[track_races["session_type"] == stype]
+            filtered_laps = track_laps[track_laps["session_type"] == stype] if not track_laps.empty else track_laps
+            per_track_type_charts[track][stype] = build_charts(filtered_races, filtered_laps)
+            race_list[track][stype] = _build_race_list(filtered_races)
+            print(f"  Generated charts for {track} / {stype} ({len(filtered_races)} session(s))")
 
     # Default to the most recent race's track
     default_track = races_df.sort_values("date").iloc[-1]["track"]
@@ -82,7 +112,8 @@ def main():
     html = template.render(
         race_count=len(races_df),
         races=races,
-        per_track_charts=per_track_charts,
+        per_track_type_charts=per_track_type_charts,
+        race_list_json=json.dumps(race_list),
         tracks=tracks,
         default_track=default_track,
     )
