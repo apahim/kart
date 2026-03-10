@@ -223,6 +223,12 @@ function applyChartFilter() {
     });
 }
 
+function _extractDate(val) {
+    if (!val) return null;
+    var m = String(val).match(/\d{4}-\d{2}-\d{2}/);
+    return m ? m[0] : null;
+}
+
 function applyRaceFilter() {
     var checkedDates = [];
     document.querySelectorAll('.race-check:checked').forEach(function(cb) {
@@ -234,22 +240,65 @@ function applyRaceFilter() {
     });
 
     // Find visible chart section
-    var visible = document.querySelector('.track-charts[style*="display: block"]');
-    if (!visible) return;
+    var section = document.querySelector('.track-charts[style*="display: block"]');
+    if (!section) return;
 
-    // Toggle Plotly trace visibility based on selected races
-    visible.querySelectorAll('.js-plotly-plot').forEach(function(plotDiv) {
-        if (!plotDiv.data) return;
-        var updates = plotDiv.data.map(function(trace) {
-            if (!trace.name) return true;
-            // Check if this trace name contains any known race date
-            var isRaceTrace = allDates.some(function(d) { return trace.name.indexOf(d) !== -1; });
-            if (!isRaceTrace) return true; // non-race traces stay visible
-            return checkedDates.some(function(d) { return trace.name.indexOf(d) !== -1; });
-        });
-        // Restyle each trace individually
-        updates.forEach(function(vis, idx) {
-            Plotly.restyle(plotDiv, {visible: vis}, [idx]);
+    section.querySelectorAll('.js-plotly-plot').forEach(function(plotDiv) {
+        if (!plotDiv._origData) return;
+
+        plotDiv._origData.forEach(function(origTrace, idx) {
+            var traceName = origTrace.name || '';
+
+            // Per-session traces: name contains a race date → toggle visibility
+            var isSessionTrace = allDates.some(function(d) { return traceName.indexOf(d) !== -1; });
+            if (isSessionTrace) {
+                var vis = checkedDates.some(function(d) { return traceName.indexOf(d) !== -1; });
+                Plotly.restyle(plotDiv, {visible: vis}, [idx]);
+                return;
+            }
+
+            // Aggregate traces: filter individual data points by date
+            if (!origTrace.x || origTrace.x.length === 0) return;
+
+            // Determine where dates live: in x values, or in text labels
+            var dateSource = null;
+            if (_extractDate(origTrace.x[0])) {
+                dateSource = 'x';
+            } else if (origTrace.text && origTrace.text.length > 0 && _extractDate(origTrace.text[0])) {
+                dateSource = 'text';
+            } else if (origTrace.customdata && origTrace.customdata.length > 0 && _extractDate(origTrace.customdata[0])) {
+                dateSource = 'customdata';
+            }
+
+            if (!dateSource) return; // can't determine dates for this trace
+
+            // Build list of indices to keep
+            var keep = [];
+            for (var i = 0; i < origTrace.x.length; i++) {
+                var dateStr;
+                if (dateSource === 'x') {
+                    dateStr = _extractDate(origTrace.x[i]);
+                } else if (dateSource === 'text') {
+                    dateStr = _extractDate(origTrace.text[i]);
+                } else {
+                    dateStr = _extractDate(origTrace.customdata[i]);
+                }
+                if (dateStr && checkedDates.indexOf(dateStr) !== -1) {
+                    keep.push(i);
+                }
+            }
+
+            // Build filtered arrays for all array properties
+            var update = {};
+            ['x', 'y', 'text', 'customdata'].forEach(function(key) {
+                if (origTrace[key] && Array.isArray(origTrace[key])) {
+                    update[key] = [keep.map(function(i) { return origTrace[key][i]; })];
+                }
+            });
+
+            if (Object.keys(update).length > 0) {
+                Plotly.restyle(plotDiv, update, [idx]);
+            }
         });
     });
 }
@@ -268,6 +317,13 @@ document.getElementById('sessionTypeFilter').addEventListener('change', applyFil
 // Attach checkbox change events (checkboxes are static in the DOM)
 document.querySelectorAll('.race-check').forEach(function(cb) {
     cb.addEventListener('change', applyRaceFilter);
+});
+
+// Save original trace data before any filtering
+document.querySelectorAll('.js-plotly-plot').forEach(function(plotDiv) {
+    if (plotDiv.data) {
+        plotDiv._origData = JSON.parse(JSON.stringify(plotDiv.data));
+    }
 });
 
 // Initial setup
