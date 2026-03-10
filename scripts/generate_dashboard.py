@@ -22,7 +22,7 @@ from scripts.analysis.laptimes import (
     create_laptime_bar_chart,
     create_delta_to_best_chart,
 )
-from scripts.analysis.track_map import create_speed_track_map
+from scripts.analysis.track_map import create_speed_track_map, create_sector_delta_map
 from scripts.analysis.speed import (
     create_cumulative_time_delta,
     create_throttle_brake_phases,
@@ -108,6 +108,13 @@ def main(race_dir):
         except Exception as e:
             print(f"Warning: sector_times failed: {e}")
             sector_data = None
+
+    if sector_data:
+        charts["sector_delta_map"] = safe_chart(
+            "sector_delta_map", create_sector_delta_map,
+            telemetry_df, best_lap, sector_data,
+            weather=weather, track_corners=track_corners,
+        )
 
     # Coaching summary / action plan
     coaching = None

@@ -162,6 +162,12 @@
         <div class="card p-2">{{ charts.temp_vs_laptime | safe }}</div>
         {% endif %}
 
+        {% if charts.raceline_evolution %}
+        <h3 class="section-title">Racing Line Evolution</h3>
+        <p class="text-muted ms-3">Best lap racing lines across sessions — compare how your line evolves over time.</p>
+        <div class="card p-2">{{ charts.raceline_evolution | safe }}</div>
+        {% endif %}
+
     </div>
     {% endfor %}
 

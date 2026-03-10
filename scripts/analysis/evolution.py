@@ -3,6 +3,7 @@
 import os
 import glob
 
+import numpy as np
 import pandas as pd
 import yaml
 import plotly.graph_objects as go
@@ -10,6 +11,7 @@ from plotly.subplots import make_subplots
 
 from scripts.load_data import extract_laptimes_from_telemetry, load_telemetry
 from scripts.analysis.outliers import filter_non_race_laps, detect_outliers
+from scripts.analysis.utils import project_to_meters
 
 
 def load_all_races(data_dir="data/races"):
@@ -587,4 +589,92 @@ def create_temp_vs_laptime(races_df):
         xaxis_title="Ambient Temperature (°C)", yaxis_title="Lap Time (s)",
         template="plotly_white", height=400,
     )
+    return fig
+
+
+def create_raceline_evolution(races_df):
+    """Overlay best lap racing lines from each session on a single track map.
+
+    Shows how the driver's line evolves across sessions.
+    """
+    if races_df.empty:
+        return None
+
+    colors = [
+        "#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A",
+        "#19D3F3", "#FF6692", "#B6E880", "#FF97FF", "#FECB52",
+    ]
+
+    fig = go.Figure()
+    trace_count = 0
+
+    for i, (_, row) in enumerate(races_df.iterrows()):
+        race_dir_name = row["race_dir"]
+        race_dir = os.path.join("data/races", race_dir_name)
+
+        telemetry_df = load_telemetry(race_dir)
+        if telemetry_df is None:
+            continue
+
+        laps_df = extract_laptimes_from_telemetry(telemetry_df)
+        laps_df = filter_non_race_laps(laps_df)
+        if laps_df.empty or "seconds" not in laps_df.columns:
+            continue
+
+        clean_df, _ = detect_outliers(laps_df)
+        if clean_df.empty:
+            continue
+        best_lap = int(clean_df.loc[clean_df["seconds"].idxmin(), "lap"])
+
+        # Find GPS columns
+        lat_col = lon_col = None
+        for col in telemetry_df.columns:
+            cl = col.lower()
+            if "latitude" in cl:
+                lat_col = col
+            if "longitude" in cl:
+                lon_col = col
+        if not lat_col or not lon_col:
+            continue
+
+        lap_data = telemetry_df[telemetry_df["lap_number"] == best_lap].copy()
+        lap_data = lap_data.dropna(subset=[lat_col, lon_col])
+        if len(lap_data) < 20:
+            continue
+
+        x_m, y_m = project_to_meters(lap_data[lat_col].values, lap_data[lon_col].values)
+
+        date_str = row["date"].strftime("%Y-%m-%d") if pd.notna(row["date"]) else race_dir_name[:10]
+        label = date_str
+        if row.get("session_type"):
+            label += f" ({row['session_type']})"
+
+        color = colors[i % len(colors)]
+        fig.add_trace(go.Scatter(
+            x=x_m, y=y_m,
+            mode="lines",
+            name=label,
+            line=dict(color=color, width=2),
+            hovertemplate=f"{label}<extra></extra>",
+        ))
+        trace_count += 1
+
+    if trace_count == 0:
+        return None
+
+    fig.update_layout(
+        title="Racing Line Evolution",
+        xaxis=dict(scaleanchor="y", scaleratio=1),
+        yaxis=dict(),
+        template="plotly_white",
+        height=500,
+        showlegend=True,
+    )
+
+    # Hide axes for clean map look
+    axis_opts = dict(
+        showticklabels=False, showgrid=False, zeroline=False, title="",
+    )
+    fig.update_layout(xaxis=axis_opts, yaxis=axis_opts)
+
     return fig

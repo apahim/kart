@@ -26,6 +26,7 @@ from scripts.analysis.evolution import (
     create_weather_impact,
     create_weight_vs_performance,
     create_temp_vs_laptime,
+    create_raceline_evolution,
 )
 
 
@@ -42,6 +43,7 @@ def build_charts(races_df, all_laps_df):
         "weather_impact": safe_chart("weather_impact", create_weather_impact, races_df),
         "weight_vs_performance": safe_chart("weight_vs_performance", create_weight_vs_performance, races_df),
         "temp_vs_laptime": safe_chart("temp_vs_laptime", create_temp_vs_laptime, races_df),
+        "raceline_evolution": safe_chart("raceline_evolution", create_raceline_evolution, races_df),
     }
 
 

@@ -175,17 +175,24 @@ def compute_sector_times(df, laptimes_df, sector_boundaries, time_col="seconds")
         return None
 
     best_sectors = []
+    best_sector_laps = []
     for si in range(n_sectors):
-        best_sectors.append(min(times[si] for times in sector_times.values()))
+        best_time = min(times[si] for times in sector_times.values())
+        best_sectors.append(best_time)
+        best_sector_laps.append(
+            min(lap for lap, times in sector_times.items() if times[si] == best_time)
+        )
 
     theoretical_best = sum(best_sectors)
 
     return {
         "sector_times": sector_times,
         "best_sectors": best_sectors,
+        "best_sector_laps": best_sector_laps,
         "theoretical_best": theoretical_best,
         "clean_laps": sorted(clean_df["lap"].astype(int)),
         "best_lap": best_lap,
+        "sector_boundaries": sector_boundaries,
     }
 
 
@@ -266,4 +273,8 @@ def create_sector_times_table(df, laptimes_df=None, time_col="seconds", metadata
         "rows": rows,
         "theoretical_row": theoretical_row,
         "best_lap": best_lap,
+        "sector_boundaries": boundaries,
+        "best_sectors": best_sectors,
+        "best_sector_laps": result["best_sector_laps"],
+        "sector_times": sector_times,
     }
