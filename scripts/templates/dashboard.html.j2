@@ -254,9 +254,9 @@
                     {% for session in raceline_data.sessions %}
                     {% set si = loop.index0 %}
                     <div class="accordion-item">
-                        <h2 class="accordion-header d-flex align-items-center">
-                            <input class="form-check-input rl-session-check me-2 ms-2 flex-shrink-0" type="checkbox" id="rl_session_{{ si }}" data-session="{{ si }}" checked style="z-index: 10;">
-                            <button class="accordion-button {% if not session.is_current %}collapsed{% endif %} py-2 ps-1" type="button" data-bs-toggle="collapse" data-bs-target="#rlSession{{ si }}" style="font-size: 0.85rem;">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button {% if not session.is_current %}collapsed{% endif %} py-2" type="button" data-bs-toggle="collapse" data-bs-target="#rlSession{{ si }}" style="font-size: 0.85rem;">
+                                <input class="form-check-input rl-session-check me-2 flex-shrink-0" type="checkbox" id="rl_session_{{ si }}" data-session="{{ si }}" checked onclick="event.stopPropagation()">
                                 {{ session.date }}{% if session.session_type %} &mdash; {{ session.session_type }}{% endif %}
                             </button>
                         </h2>
