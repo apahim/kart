@@ -30,13 +30,23 @@
         .action-icon.check { background-color: #2ecc71; color: white; }
 
         @media (max-width: 576px) {
+            .container-fluid { padding-left: 0.75rem; padding-right: 0.75rem; }
+            h1 { font-size: 1.4rem; }
             .stat-value { font-size: 1.3rem; }
             .stat-label { font-size: 0.7rem; }
-            .section-title { font-size: 1.1rem; }
+            .section-title { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; }
             .section-desc { font-size: 0.8rem; }
+            .card { margin-bottom: 1rem; }
             .card.text-center.p-3 { padding: 0.75rem !important; }
-            .card.p-2 { padding: 0.5rem !important; }
+            .card.p-2 { padding: 0.25rem !important; }
             .metadata-badge { font-size: 0.75rem; }
+            .action-plan .action-item { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+            .action-icon { width: 24px; height: 24px; font-size: 0.75rem; margin-right: 0.5rem; }
+            #racelineChart { height: 300px !important; }
+            .rl-selector { max-height: 250px !important; }
+            .accordion-button { font-size: 0.8rem !important; padding: 0.4rem 0.5rem !important; }
+            .form-check { margin-bottom: 0.1rem; }
+            .js-plotly-plot { min-height: 0 !important; }
         }
     </style>
 </head>
@@ -148,17 +158,17 @@
     {% if charts.speed_track_map or charts.braking_map or charts.sector_delta_map %}
     <div class="row">
         {% if charts.speed_track_map %}
-        <div class="col-md-4">
+        <div class="col-md-4 col-6">
             <div class="card p-2">{{ charts.speed_track_map | safe }}</div>
         </div>
         {% endif %}
         {% if charts.braking_map %}
-        <div class="col-md-4">
+        <div class="col-md-4 col-6">
             <div class="card p-2">{{ charts.braking_map | safe }}</div>
         </div>
         {% endif %}
         {% if charts.sector_delta_map %}
-        <div class="col-md-4">
+        <div class="col-md-4 col-6">
             <div class="card p-2">{{ charts.sector_delta_map | safe }}</div>
         </div>
         {% endif %}
@@ -186,8 +196,8 @@
     <p class="section-desc">Compare racing lines across laps and sessions. Best laps from each session are pre-selected. Toggle individual laps to compare specific lines.</p>
 
     <div class="row">
-        <div class="col-md-4">
-            <div class="card p-3" style="max-height: 550px; overflow-y: auto;">
+        <div class="col-md-4 col-12 order-md-1 order-2">
+            <div class="card p-3 rl-selector" style="max-height: 550px; overflow-y: auto;">
                 <div class="accordion" id="racelineAccordion">
                     {% for session in raceline_data.sessions %}
                     {% set si = loop.index0 %}
@@ -219,7 +229,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-8">
+        <div class="col-md-8 col-12 order-md-2 order-1">
             <div class="card p-2">
                 <div id="racelineChart" style="height: 500px;"></div>
             </div>
