@@ -180,69 +180,7 @@
     {% endif %}
     {% endif %}
 
-    <!-- Section 3: Where to Improve -->
-    {% if sector_data or charts.corner_time_loss or charts.braking_consistency %}
-    <h3 class="section-title">Where to Improve</h3>
-    <p class="section-desc">The corner time loss chart ranks which corners cost you the most. Wide braking boxes mean inconsistent braking — an easy area to improve. Sector times show where within a lap you can gain time.</p>
-
-    {% if charts.corner_time_loss %}
-    <div class="row">
-        <div class="col-12">
-            <div class="card p-2">{{ charts.corner_time_loss | safe }}</div>
-        </div>
-    </div>
-    {% endif %}
-    {% if charts.braking_consistency %}
-    <div class="row">
-        <div class="col-12">
-            <div class="card p-2">{{ charts.braking_consistency | safe }}</div>
-        </div>
-    </div>
-    {% endif %}
-    {% if sector_data %}
-    <div class="row">
-        <div class="col-12">
-            <div class="card p-2">
-                <h6 class="card-title text-center mb-2">Sector Times</h6>
-                <div class="table-responsive">
-                <table class="table table-sm table-hover text-center mb-0" style="font-size: 0.85rem;">
-                    <thead class="table-primary">
-                        <tr>
-                            <th>Lap</th>
-                            {% for h in sector_data.headers %}<th>{{ h }}</th>{% endfor %}
-                            <th>Total</th>
-                            <th>Delta</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in sector_data.rows %}
-                        <tr{% if row.is_best %} class="fw-bold"{% endif %}>
-                            <td>L{{ row.lap }}</td>
-                            {% for s in row.sectors %}
-                            <td class="{{ s.css_class }}">{{ s.value }}</td>
-                            {% endfor %}
-                            <td>{{ row.total }}</td>
-                            <td>{{ row.delta }}</td>
-                        </tr>
-                        {% endfor %}
-                        <tr class="table-success fw-bold">
-                            <td>Ideal</td>
-                            {% for s in sector_data.theoretical_row.sectors %}
-                            <td>{{ s.value }}</td>
-                            {% endfor %}
-                            <td>{{ sector_data.theoretical_row.total }}</td>
-                            <td>-</td>
-                        </tr>
-                    </tbody>
-                </table>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    {% endif %}
-
-    <!-- Section 4: Racing Line Comparison -->
+    <!-- Section 3: Racing Line Comparison -->
     {% if raceline_data %}
     <h3 class="section-title">Racing Line Comparison</h3>
     <p class="section-desc">Compare racing lines across laps and sessions. Best laps from each session are pre-selected. Toggle individual laps to compare specific lines.</p>
@@ -353,6 +291,68 @@
         renderRaceline();
     })();
     </script>
+    {% endif %}
+
+    <!-- Section 4: Where to Improve -->
+    {% if sector_data or charts.corner_time_loss or charts.braking_consistency %}
+    <h3 class="section-title">Where to Improve</h3>
+    <p class="section-desc">The corner time loss chart ranks which corners cost you the most. Wide braking boxes mean inconsistent braking — an easy area to improve. Sector times show where within a lap you can gain time.</p>
+
+    {% if charts.corner_time_loss %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">{{ charts.corner_time_loss | safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if charts.braking_consistency %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">{{ charts.braking_consistency | safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if sector_data %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">
+                <h6 class="card-title text-center mb-2">Sector Times</h6>
+                <div class="table-responsive">
+                <table class="table table-sm table-hover text-center mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Lap</th>
+                            {% for h in sector_data.headers %}<th>{{ h }}</th>{% endfor %}
+                            <th>Total</th>
+                            <th>Delta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in sector_data.rows %}
+                        <tr{% if row.is_best %} class="fw-bold"{% endif %}>
+                            <td>L{{ row.lap }}</td>
+                            {% for s in row.sectors %}
+                            <td class="{{ s.css_class }}">{{ s.value }}</td>
+                            {% endfor %}
+                            <td>{{ row.total }}</td>
+                            <td>{{ row.delta }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="table-success fw-bold">
+                            <td>Ideal</td>
+                            {% for s in sector_data.theoretical_row.sectors %}
+                            <td>{{ s.value }}</td>
+                            {% endfor %}
+                            <td>{{ sector_data.theoretical_row.total }}</td>
+                            <td>-</td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     {% endif %}
 
     <footer class="text-center text-muted py-4">
