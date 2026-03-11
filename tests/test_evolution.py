@@ -1,123 +1,124 @@
-"""Tests for scripts/analysis/evolution.py — cross-race evolution charts."""
+"""Tests for scripts/analysis/evolution.py — cross-race evolution analysis."""
 
+import os
+import tempfile
+
+import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import pytest
+import yaml
 
 from scripts.analysis.evolution import (
-    enrich_races_with_quartiles,
-    create_lap_distribution,
-    create_session_overlay,
-    create_laptime_progression,
-    create_improvement_summary,
-    create_consistency_trend,
-    create_speed_gforce_trends,
+    load_all_races,
+    load_all_laptimes,
+    prepare_raceline_data,
 )
 
 
-class TestEnrichQuartiles:
-    def test_adds_columns(self, races_df, all_laps_df):
-        enriched = enrich_races_with_quartiles(races_df, all_laps_df)
-        assert "q1" in enriched.columns
-        assert "q3" in enriched.columns
-        assert enriched["q1"].notna().all()
-        assert enriched["q3"].notna().all()
+def _create_race_dir(base_dir, name, track, n_laps=5, has_gps=True):
+    """Create a minimal race directory with telemetry and metadata."""
+    race_dir = os.path.join(base_dir, name)
+    os.makedirs(race_dir, exist_ok=True)
 
-    def test_empty_laps(self, races_df):
-        result = enrich_races_with_quartiles(races_df, pd.DataFrame())
-        assert "q1" not in result.columns
+    # race.yaml
+    meta = {"track": track, "date": name[:10], "session_type": "Practice"}
+    with open(os.path.join(race_dir, "race.yaml"), "w") as f:
+        yaml.dump(meta, f)
 
+    # telemetry.csv — circular track
+    rows_per_lap = 50
+    n = rows_per_lap * n_laps
+    angle = np.tile(np.linspace(0, 2 * np.pi, rows_per_lap), n_laps)
+    lap_nums = np.repeat(np.arange(1, n_laps + 1), rows_per_lap)
+    elapsed = np.linspace(0, 60 * n_laps, n)
 
-class TestLapDistribution:
-    def test_returns_figure(self, all_laps_df):
-        fig = create_lap_distribution(all_laps_df)
-        assert isinstance(fig, go.Figure)
+    lat = 52.5 + 0.001 * np.sin(angle)
+    lon = -7.5 + 0.001 * np.cos(angle)
+    speed = 10 + 2 * np.sin(4 * angle)
 
-    def test_empty_returns_none(self):
-        assert create_lap_distribution(pd.DataFrame()) is None
-        assert create_lap_distribution(None) is None
+    lines = []
+    if has_gps:
+        lines.append("timestamp,elapsed_time,lap_number,latitude,longitude,speed")
+        lines.append("s,s,,deg,deg,m/s")
+        lines.append(",,,,, ")
+        for i in range(n):
+            lines.append(f"{elapsed[i]:.3f},{elapsed[i]:.3f},{int(lap_nums[i])},{lat[i]:.8f},{lon[i]:.8f},{speed[i]:.3f}")
+    else:
+        lines.append("timestamp,elapsed_time,lap_number,speed")
+        lines.append("s,s,,m/s")
+        lines.append(",,,")
+        for i in range(n):
+            lines.append(f"{elapsed[i]:.3f},{elapsed[i]:.3f},{int(lap_nums[i])},{speed[i]:.3f}")
 
-    def test_trace_count(self, all_laps_df):
-        fig = create_lap_distribution(all_laps_df)
-        n_races = all_laps_df["race_dir"].nunique()
-        assert len(fig.data) == n_races
+    with open(os.path.join(race_dir, "telemetry.csv"), "w") as f:
+        f.write("\n".join(lines))
 
-
-class TestSessionOverlay:
-    def test_returns_figure(self, all_laps_df):
-        fig = create_session_overlay(all_laps_df)
-        assert isinstance(fig, go.Figure)
-
-    def test_empty_returns_none(self):
-        assert create_session_overlay(pd.DataFrame()) is None
-        assert create_session_overlay(None) is None
-
-    def test_excludes_outliers(self, all_laps_df):
-        fig = create_session_overlay(all_laps_df)
-        # Scatter traces only (exclude hline shapes)
-        scatter_traces = [t for t in fig.data if isinstance(t, go.Scatter)]
-        all_y = []
-        for t in scatter_traces:
-            all_y.extend(list(t.y))
-        # The outlier value 72.8 should not appear
-        assert 72.8 not in all_y
+    return race_dir
 
 
-class TestLaptimeProgression:
-    def test_returns_figure(self, races_df):
-        fig = create_laptime_progression(races_df)
-        assert isinstance(fig, go.Figure)
+class TestPrepareRacelineData:
+    def test_returns_correct_structure(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack")
+        result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
+        assert result is not None
+        assert "sessions" in result
+        assert len(result["sessions"]) == 1
+        session = result["sessions"][0]
+        assert session["date"] == "2026-03-08"
+        assert session["is_current"] is True
+        assert len(session["laps"]) > 0
 
-    def test_has_median(self, races_df):
-        fig = create_laptime_progression(races_df)
-        trace_names = [t.name for t in fig.data if t.name]
-        assert "Median" in trace_names
+    def test_is_current_flag(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-01-TestTrack", "TestTrack")
+        _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack")
+        result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
+        assert result is not None
+        current = [s for s in result["sessions"] if s["is_current"]]
+        other = [s for s in result["sessions"] if not s["is_current"]]
+        assert len(current) == 1
+        assert len(other) == 1
+        assert current[0]["date"] == "2026-03-08"
 
-    def test_has_iqr_band(self, races_df, all_laps_df):
-        enriched = enrich_races_with_quartiles(races_df, all_laps_df)
-        fig = create_laptime_progression(enriched)
-        fills = [t.fill for t in fig.data if t.fill]
-        assert "tonexty" in fills
+    def test_downsample_limit(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack", n_laps=3)
+        result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
+        assert result is not None
+        for session in result["sessions"]:
+            for lap in session["laps"]:
+                assert len(lap["x"]) <= 200
+                assert len(lap["y"]) <= 200
 
-    def test_empty_returns_none(self):
-        assert create_laptime_progression(pd.DataFrame()) is None
+    def test_no_gps_excluded(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack", has_gps=False)
+        result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
+        assert result is None
 
+    def test_different_track_excluded(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-08-TrackA", "TrackA")
+        _create_race_dir(str(tmp_path), "2026-03-08-TrackB", "TrackB")
+        result = prepare_raceline_data("TrackA", str(tmp_path / "2026-03-08-TrackA"), data_dir=str(tmp_path))
+        assert result is not None
+        assert len(result["sessions"]) == 1
+        assert result["sessions"][0]["date"] == "2026-03-08"
 
-class TestImprovementSummary:
-    def test_returns_figure(self, races_df):
-        fig = create_improvement_summary(races_df)
-        assert isinstance(fig, go.Figure)
+    def test_lap_fields(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack")
+        result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
+        lap = result["sessions"][0]["laps"][0]
+        assert "lap" in lap
+        assert "time_fmt" in lap
+        assert "seconds" in lap
+        assert "is_best" in lap
+        assert "is_outlier" in lap
+        assert "x" in lap
+        assert "y" in lap
 
-    def test_none_single_race(self, races_df):
-        single = races_df.iloc[:1]
-        assert create_improvement_summary(single) is None
+    def test_has_best_lap(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack", n_laps=5)
+        result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
+        best_laps = [l for l in result["sessions"][0]["laps"] if l["is_best"]]
+        assert len(best_laps) == 1
 
-    def test_colors(self, races_df):
-        fig = create_improvement_summary(races_df)
-        # All races improve (lower times), so colors should be green
-        for trace in fig.data:
-            if isinstance(trace, go.Bar):
-                for color in trace.marker.color:
-                    assert color == "#2ecc71"
-
-
-class TestConsistencyTrend:
-    def test_returns_figure(self, races_df):
-        fig = create_consistency_trend(races_df)
-        assert isinstance(fig, go.Figure)
-
-    def test_yaxis_narrowed(self, races_df):
-        fig = create_consistency_trend(races_df)
-        # Y-axis should not span 0-100; range should be close to the data
-        y_range = fig.layout.yaxis.range
-        assert y_range is not None
-        assert y_range[0] > 90  # consistency is ~99%, lower bound should be near
-
-
-class TestSpeedGforceTrends:
-    def test_returns_figure(self, races_df):
-        fig = create_speed_gforce_trends(races_df)
-        assert isinstance(fig, go.Figure)
-
-    def test_empty_returns_none(self):
-        assert create_speed_gforce_trends(pd.DataFrame()) is None
+    def test_empty_dir_returns_none(self, tmp_path):
+        result = prepare_raceline_data("NoTrack", str(tmp_path / "nonexistent"), data_dir=str(tmp_path))
+        assert result is None

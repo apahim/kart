@@ -133,10 +133,16 @@ def add_wind_arrow(fig, weather):
     )
 
 
-def project_to_meters(lat, lon):
+def project_to_meters(lat, lon, center=None):
     """Project lat/lon to local XY meters using equirectangular projection.
 
     Accurate enough for a ~400m kart track.
+
+    Args:
+        lat: Latitude values.
+        lon: Longitude values.
+        center: Optional (lat_mean, lon_mean) tuple to use as projection origin.
+                If None, auto-centers on the mean of the input data.
 
     Returns:
         Tuple of (x_meters, y_meters) as numpy arrays.
@@ -144,8 +150,11 @@ def project_to_meters(lat, lon):
     lat = np.asarray(lat, dtype=float)
     lon = np.asarray(lon, dtype=float)
 
-    lat_mean = np.mean(lat)
-    lon_mean = np.mean(lon)
+    if center is not None:
+        lat_mean, lon_mean = center
+    else:
+        lat_mean = np.mean(lat)
+        lon_mean = np.mean(lon)
     lat_mean_rad = np.radians(lat_mean)
 
     x = (lon - lon_mean) * 111320 * np.cos(lat_mean_rad)

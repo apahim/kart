@@ -242,9 +242,116 @@
     {% endif %}
     {% endif %}
 
+    <!-- Section 4: Racing Line Comparison -->
+    {% if raceline_data %}
+    <h3 class="section-title">Racing Line Comparison</h3>
+    <p class="section-desc">Compare racing lines across laps and sessions. Best laps from each session are pre-selected. Toggle individual laps to compare specific lines.</p>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card p-3" style="max-height: 550px; overflow-y: auto;">
+                <div class="accordion" id="racelineAccordion">
+                    {% for session in raceline_data.sessions %}
+                    {% set si = loop.index0 %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button {% if not session.is_current %}collapsed{% endif %} py-2" type="button" data-bs-toggle="collapse" data-bs-target="#rlSession{{ si }}" style="font-size: 0.85rem;">
+                                {{ session.date }}{% if session.session_type %} &mdash; {{ session.session_type }}{% endif %}
+                            </button>
+                        </h2>
+                        <div id="rlSession{{ si }}" class="accordion-collapse collapse {% if session.is_current %}show{% endif %}" data-bs-parent="#racelineAccordion">
+                            <div class="accordion-body py-2 px-3">
+                                <div class="mb-1">
+                                    <a href="#" class="rl-toggle-all small" data-session="{{ si }}">All</a> /
+                                    <a href="#" class="rl-toggle-none small" data-session="{{ si }}">None</a>
+                                </div>
+                                {% for lap in session.laps %}
+                                <div class="form-check">
+                                    <input class="form-check-input rl-lap-check" type="checkbox" id="rl_s{{ si }}_l{{ loop.index0 }}" data-session="{{ si }}" data-lap="{{ loop.index0 }}" {% if lap.is_best %}checked{% endif %}>
+                                    <label class="form-check-label {% if lap.is_outlier %}text-muted{% endif %}" for="rl_s{{ si }}_l{{ loop.index0 }}" style="font-size: 0.8rem;">
+                                        Lap {{ lap.lap }} &mdash; {{ lap.time_fmt }}{% if lap.is_best %} <span class="badge bg-success" style="font-size: 0.65rem;">best</span>{% endif %}{% if lap.is_outlier %} <span class="text-muted">(outlier)</span>{% endif %}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card p-2">
+                <div id="racelineChart" style="height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var rlData = {{ raceline_data | tojson }};
+        var colors = ["#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A",
+                       "#19D3F3", "#FF6692", "#B6E880", "#FF97FF", "#FECB52"];
+
+        function renderRaceline() {
+            var traces = [];
+            rlData.sessions.forEach(function(session, si) {
+                var color = colors[si % colors.length];
+                session.laps.forEach(function(lap, li) {
+                    var cb = document.getElementById("rl_s" + si + "_l" + li);
+                    if (!cb || !cb.checked) return;
+                    traces.push({
+                        x: lap.x, y: lap.y,
+                        mode: "lines",
+                        name: session.date + " L" + lap.lap + " (" + lap.time_fmt + ")",
+                        line: {color: color, width: lap.is_best ? 2.5 : 1.5},
+                        opacity: lap.is_best ? 1.0 : 0.5,
+                        hovertemplate: session.date + " Lap " + lap.lap + " (" + lap.time_fmt + ")<extra></extra>"
+                    });
+                });
+            });
+            var layout = {
+                xaxis: {scaleanchor: "y", scaleratio: 1, showticklabels: false, showgrid: false, zeroline: false, title: ""},
+                yaxis: {showticklabels: false, showgrid: false, zeroline: false, title: ""},
+                margin: {l: 20, r: 20, t: 20, b: 20},
+                showlegend: true,
+                legend: {font: {size: 10}, orientation: "h", yanchor: "top", y: -0.02, xanchor: "center", x: 0.5},
+                height: 500
+            };
+            Plotly.react("racelineChart", traces, layout, {responsive: true});
+        }
+
+        document.querySelectorAll(".rl-lap-check").forEach(function(cb) {
+            cb.addEventListener("change", renderRaceline);
+        });
+
+        document.querySelectorAll(".rl-toggle-all").forEach(function(a) {
+            a.addEventListener("click", function(e) {
+                e.preventDefault();
+                var si = this.dataset.session;
+                document.querySelectorAll('.rl-lap-check[data-session="' + si + '"]').forEach(function(cb) { cb.checked = true; });
+                renderRaceline();
+            });
+        });
+
+        document.querySelectorAll(".rl-toggle-none").forEach(function(a) {
+            a.addEventListener("click", function(e) {
+                e.preventDefault();
+                var si = this.dataset.session;
+                document.querySelectorAll('.rl-lap-check[data-session="' + si + '"]').forEach(function(cb) { cb.checked = false; });
+                renderRaceline();
+            });
+        });
+
+        renderRaceline();
+    })();
+    </script>
+    {% endif %}
+
     <footer class="text-center text-muted py-4">
         <small>Generated {{ summary.generated }}</small>
     </footer>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

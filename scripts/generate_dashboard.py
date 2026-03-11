@@ -33,6 +33,7 @@ from scripts.analysis.corners import (
 from scripts.analysis.braking import create_braking_track_map, create_braking_consistency_chart
 from scripts.analysis.sectors import create_sector_times_table
 from scripts.analysis.coaching import generate_coaching_summary
+from scripts.analysis.evolution import prepare_raceline_data
 
 
 def main(race_dir):
@@ -127,6 +128,15 @@ def main(race_dir):
     except Exception as e:
         print(f"Warning: coaching summary failed: {e}")
 
+    # Prepare racing line comparison data
+    raceline_data = None
+    try:
+        raceline_data = prepare_raceline_data(track_name, race_dir)
+        if raceline_data:
+            print(f"Raceline data: {len(raceline_data['sessions'])} session(s)")
+    except Exception as e:
+        print(f"Warning: raceline data failed: {e}")
+
     # Render template
     template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
     env = Environment(loader=FileSystemLoader(template_dir))
@@ -141,6 +151,7 @@ def main(race_dir):
         charts=charts,
         coaching=coaching,
         sector_data=sector_data,
+        raceline_data=raceline_data,
     )
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

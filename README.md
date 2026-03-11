@@ -27,22 +27,21 @@ Each race session gets an interactive dashboard with three sections:
 
 **Where to Improve** — per-corner time loss analysis, braking consistency comparison, and sector times table with delta highlighting.
 
-### Evolution Dashboard
+### Racing Line Comparison
 
-Cross-session progression trends showing improvement over time across all recorded sessions.
+Each session dashboard includes a racing line comparison panel at the bottom. It overlays GPS traces from any lap in the current session or any other session at the same track, allowing visual comparison of lines across sessions.
 
 ### Generate commands
 
 ```bash
-# Single race + evolution + index
+# Single race + index
 python scripts/generate_all.py data/races/2026-03-08-Kiltorcan/
 
-# All races + evolution + index
+# All races + index
 python scripts/generate_all.py --all
 
 # Individual generators
 python scripts/generate_dashboard.py data/races/2026-03-08-Kiltorcan/
-python scripts/generate_evolution.py
 python scripts/generate_index.py
 ```
 
@@ -50,7 +49,6 @@ Output structure:
 ```
 docs/
 ├── index.html
-├── evolution.html
 └── races/
     └── 2026-03-08-Kiltorcan/
         └── dashboard.html
@@ -101,7 +99,6 @@ data/
 scripts/
   generate_all.py               # orchestrates all generators
   generate_dashboard.py         # single-race dashboard
-  generate_evolution.py         # cross-session evolution
   generate_index.py             # index page
   load_data.py                  # telemetry & metadata loading
   analysis/                     # 14 analysis modules (see scripts/README.md)

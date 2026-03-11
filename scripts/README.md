@@ -6,9 +6,8 @@ Python scripts for generating kart racing dashboards and analyzing telemetry dat
 
 | Script | Description |
 |--------|-------------|
-| `generate_all.py` | Orchestrates dashboard, evolution, and index generation |
+| `generate_all.py` | Orchestrates dashboard and index generation |
 | `generate_dashboard.py` | Generates a single-race interactive HTML dashboard |
-| `generate_evolution.py` | Generates cross-session progression dashboard |
 | `generate_index.py` | Generates the index page linking all race dashboards |
 
 ## Analysis Modules (`analysis/`)
@@ -23,7 +22,7 @@ Python scripts for generating kart racing dashboards and analyzing telemetry dat
 | `braking.py` | Braking/acceleration zone analysis with track map coloring |
 | `sectors.py` | Sector time analysis using track corner boundaries |
 | `coaching.py` | Coaching summary and structured action plan generation |
-| `evolution.py` | Cross-race improvement tracking across sessions |
+| `evolution.py` | Cross-race data loading and racing line comparison |
 | `summary.py` | Race summary statistics with IQR-filtered lap times |
 | `outliers.py` | IQR-based outlier detection and non-race lap filtering |
 | `weather.py` | Weather data fetching from Open-Meteo archive API |
@@ -43,7 +42,6 @@ Python scripts for generating kart racing dashboards and analyzing telemetry dat
 | Template | Description |
 |----------|-------------|
 | `dashboard.html.j2` | Single-race dashboard with all chart sections |
-| `evolution.html.j2` | Cross-session evolution page |
 | `index.html.j2` | Index page listing all race sessions |
 
 ## Legacy Scripts

@@ -16,9 +16,9 @@ venv/bin/python scripts/generate_all.py --all    # regenerate all dashboards
 
 - `data/races/YYYY-MM-DD-TrackName/` — race.yaml + telemetry.csv + summary_generated.yaml
 - `data/tracks.yaml` — track corner definitions and coordinates
-- `scripts/` — generator scripts (generate_all, generate_dashboard, generate_evolution, generate_index)
+- `scripts/` — generator scripts (generate_all, generate_dashboard, generate_index)
 - `scripts/analysis/` — 14 analysis modules (laptimes, track_map, speed, gforce, corners, braking, sectors, coaching, evolution, summary, outliers, weather, tracks, utils)
-- `scripts/templates/` — Jinja2 HTML templates (dashboard.html.j2, evolution.html.j2, index.html.j2)
+- `scripts/templates/` — Jinja2 HTML templates (dashboard.html.j2, index.html.j2)
 - `scripts/load_data.py` — telemetry and metadata loading functions
 - `tests/` — pytest test suite
 - `docs/` — generated HTML output (committed for GitHub Pages)

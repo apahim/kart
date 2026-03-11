@@ -13,7 +13,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.generate_dashboard import main as generate_dashboard
-from scripts.generate_evolution import main as generate_evolution
 from scripts.generate_index import main as generate_index
 
 
@@ -39,9 +38,6 @@ def main():
             generate_dashboard(race_dir)
     else:
         generate_dashboard(args.race_dir)
-
-    print("\n=== Evolution dashboard ===")
-    generate_evolution()
 
     print("\n=== Index page ===")
     generate_index()
