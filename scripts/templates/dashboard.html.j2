@@ -43,7 +43,7 @@
             .action-plan .action-item { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
             .action-icon { width: 24px; height: 24px; font-size: 0.75rem; margin-right: 0.5rem; }
             #racelineChart { height: 300px !important; }
-            .rl-selector { max-height: 250px !important; }
+            .rl-selector { max-height: none !important; overflow-y: visible !important; }
             .accordion-button { font-size: 0.8rem !important; padding: 0.4rem 0.5rem !important; }
             .form-check { margin-bottom: 0.1rem; }
             .js-plotly-plot { min-height: 0 !important; }
@@ -158,17 +158,17 @@
     {% if charts.speed_track_map or charts.braking_map or charts.sector_delta_map %}
     <div class="row">
         {% if charts.speed_track_map %}
-        <div class="col-md-4 col-6">
+        <div class="col-md-4">
             <div class="card p-2">{{ charts.speed_track_map | safe }}</div>
         </div>
         {% endif %}
         {% if charts.braking_map %}
-        <div class="col-md-4 col-6">
+        <div class="col-md-4">
             <div class="card p-2">{{ charts.braking_map | safe }}</div>
         </div>
         {% endif %}
         {% if charts.sector_delta_map %}
-        <div class="col-md-4 col-6">
+        <div class="col-md-4">
             <div class="card p-2">{{ charts.sector_delta_map | safe }}</div>
         </div>
         {% endif %}
