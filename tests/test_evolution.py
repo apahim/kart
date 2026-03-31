@@ -112,12 +112,29 @@ class TestPrepareRacelineData:
         assert "is_outlier" in lap
         assert "x" in lap
         assert "y" in lap
+        assert "t" in lap
+        assert len(lap["t"]) == len(lap["x"])
 
     def test_has_best_lap(self, tmp_path):
         _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack", n_laps=5)
         result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
         best_laps = [l for l in result["sessions"][0]["laps"] if l["is_best"]]
         assert len(best_laps) == 1
+
+    def test_t_array_zero_based_and_increasing(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack")
+        result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
+        for session in result["sessions"]:
+            for lap in session["laps"]:
+                assert lap["t"][0] == 0.0
+                assert all(lap["t"][i] < lap["t"][i + 1] for i in range(len(lap["t"]) - 1))
+
+    def test_t_array_duration_matches_lap_time(self, tmp_path):
+        _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack")
+        result = prepare_raceline_data("TestTrack", str(tmp_path / "2026-03-08-TestTrack"), data_dir=str(tmp_path))
+        for session in result["sessions"]:
+            for lap in session["laps"]:
+                assert abs(lap["t"][-1] - lap["seconds"]) < 2.0
 
     def test_empty_dir_returns_none(self, tmp_path):
         result = prepare_raceline_data("NoTrack", str(tmp_path / "nonexistent"), data_dir=str(tmp_path))

@@ -205,11 +205,19 @@ def prepare_raceline_data(track_name, current_race_dir, data_dir="data/races"):
             lon_vals = lap_data[lon_col].values
             x_m, y_m = project_to_meters(lat_vals, lon_vals, center=center)
 
+            # Extract elapsed time within lap (zero-based)
+            t_vals = None
+            if "elapsed_time" in lap_data.columns:
+                t_vals = lap_data["elapsed_time"].values.copy()
+                t_vals = t_vals - t_vals[0]
+
             # Downsample to ~200 points
             if len(x_m) > 200:
                 indices = np.linspace(0, len(x_m) - 1, 200, dtype=int)
                 x_m = x_m[indices]
                 y_m = y_m[indices]
+                if t_vals is not None:
+                    t_vals = t_vals[indices]
 
             is_outlier = row.name not in clean_indices
             seconds = float(row["seconds"])
@@ -222,6 +230,7 @@ def prepare_raceline_data(track_name, current_race_dir, data_dir="data/races"):
                 "is_outlier": is_outlier,
                 "x": [round(float(v), 2) for v in x_m],
                 "y": [round(float(v), 2) for v in y_m],
+                "t": [round(float(v), 3) for v in t_vals] if t_vals is not None else None,
             })
 
         if session_laps:

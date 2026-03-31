@@ -232,6 +232,17 @@
         <div class="col-md-8 col-12 order-md-2 order-1">
             <div class="card p-2">
                 <div id="racelineChart" style="height: 500px;"></div>
+                <div id="racelinePlayback" class="d-flex align-items-center gap-2 mt-2 px-2" style="font-size: 0.85rem;">
+                    <button id="rlPlayBtn" class="btn btn-sm btn-outline-primary" title="Play/Pause" style="min-width: 36px;">&#9654;</button>
+                    <input id="rlTimeline" type="range" class="form-range flex-grow-1" min="0" max="100" step="0.1" value="0" style="height: 20px;">
+                    <span id="rlTimeDisplay" style="min-width: 55px; text-align: right; font-variant-numeric: tabular-nums;">0.0s</span>
+                    <select id="rlSpeedSelect" class="form-select form-select-sm" style="width: auto;">
+                        <option value="1">1x</option>
+                        <option value="2" selected>2x</option>
+                        <option value="5">5x</option>
+                        <option value="10">10x</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -242,8 +253,38 @@
         var colors = ["#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A",
                        "#19D3F3", "#FF6692", "#B6E880", "#FF97FF", "#FECB52"];
 
+        // Animation state
+        var animPlaying = false;
+        var animTime = 0;
+        var animMaxTime = 0;
+        var animRAF = null;
+        var animLastTS = null;
+        var animSpeed = 2;
+        var markerMeta = [];  // {traceIndex, lap, color} for each marker trace
+
+        function interpPos(lap, t) {
+            if (!lap.t || lap.t.length === 0) return null;
+            if (t <= lap.t[0]) return {x: lap.x[0], y: lap.y[0]};
+            if (t >= lap.t[lap.t.length - 1]) return {x: lap.x[lap.x.length - 1], y: lap.y[lap.y.length - 1]};
+            var lo = 0, hi = lap.t.length - 1;
+            while (hi - lo > 1) {
+                var mid = (lo + hi) >> 1;
+                if (lap.t[mid] <= t) lo = mid; else hi = mid;
+            }
+            var frac = (t - lap.t[lo]) / (lap.t[hi] - lap.t[lo]);
+            return {
+                x: lap.x[lo] + frac * (lap.x[hi] - lap.x[lo]),
+                y: lap.y[lo] + frac * (lap.y[hi] - lap.y[lo])
+            };
+        }
+
         function renderRaceline() {
+            stopAnim();
+            animTime = 0;
+            animMaxTime = 0;
+            markerMeta = [];
             var traces = [];
+
             rlData.sessions.forEach(function(session, si) {
                 var sessionCb = document.getElementById("rl_session_" + si);
                 if (sessionCb && !sessionCb.checked) return;
@@ -251,6 +292,7 @@
                 session.laps.forEach(function(lap, li) {
                     var cb = document.getElementById("rl_s" + si + "_l" + li);
                     if (!cb || !cb.checked) return;
+                    // Line trace
                     traces.push({
                         x: lap.x, y: lap.y,
                         mode: "lines",
@@ -259,8 +301,24 @@
                         opacity: lap.is_best ? 1.0 : 0.5,
                         hovertemplate: session.date + " Lap " + lap.lap + " (" + lap.time_fmt + ")<extra></extra>"
                     });
+                    // Marker trace for animation
+                    if (lap.t && lap.t.length > 0) {
+                        var mIdx = traces.length;
+                        traces.push({
+                            x: [lap.x[0]], y: [lap.y[0]],
+                            mode: "markers",
+                            marker: {color: color, size: 12, symbol: "circle",
+                                     line: {color: "white", width: 2}},
+                            showlegend: false,
+                            hovertemplate: session.date + " L" + lap.lap + "<extra></extra>"
+                        });
+                        markerMeta.push({traceIndex: mIdx, lap: lap});
+                        var lapEnd = lap.t[lap.t.length - 1];
+                        if (lapEnd > animMaxTime) animMaxTime = lapEnd;
+                    }
                 });
             });
+
             var layout = {
                 xaxis: {scaleanchor: "y", scaleratio: 1, showticklabels: false, showgrid: false, zeroline: false, title: ""},
                 yaxis: {showticklabels: false, showgrid: false, zeroline: false, title: ""},
@@ -270,8 +328,79 @@
                 height: 500
             };
             Plotly.react("racelineChart", traces, layout, {responsive: true});
+
+            // Update timeline slider range
+            var slider = document.getElementById("rlTimeline");
+            slider.max = animMaxTime > 0 ? animMaxTime.toFixed(1) : "100";
+            slider.value = "0";
+            document.getElementById("rlTimeDisplay").textContent = "0.0s";
         }
 
+        function updateMarkers() {
+            var chartDiv = document.getElementById("racelineChart");
+            for (var i = 0; i < markerMeta.length; i++) {
+                var mt = markerMeta[i];
+                var pos = interpPos(mt.lap, animTime);
+                if (pos) {
+                    Plotly.restyle(chartDiv, {x: [[pos.x]], y: [[pos.y]]}, [mt.traceIndex]);
+                }
+            }
+            document.getElementById("rlTimeline").value = animTime.toFixed(1);
+            document.getElementById("rlTimeDisplay").textContent = animTime.toFixed(1) + "s";
+        }
+
+        function animFrame(timestamp) {
+            if (!animPlaying) return;
+            if (animLastTS === null) animLastTS = timestamp;
+            var dt = (timestamp - animLastTS) / 1000.0;
+            animLastTS = timestamp;
+            animTime += dt * animSpeed;
+            if (animTime >= animMaxTime) {
+                animTime = animMaxTime;
+                updateMarkers();
+                stopAnim();
+                return;
+            }
+            updateMarkers();
+            animRAF = requestAnimationFrame(animFrame);
+        }
+
+        function startAnim() {
+            if (markerMeta.length === 0) return;
+            animPlaying = true;
+            animLastTS = null;
+            document.getElementById("rlPlayBtn").innerHTML = "&#9646;&#9646;";
+            animRAF = requestAnimationFrame(animFrame);
+        }
+
+        function stopAnim() {
+            animPlaying = false;
+            document.getElementById("rlPlayBtn").innerHTML = "&#9654;";
+            if (animRAF) cancelAnimationFrame(animRAF);
+            animRAF = null;
+        }
+
+        // Playback controls
+        document.getElementById("rlPlayBtn").addEventListener("click", function() {
+            if (animPlaying) {
+                stopAnim();
+            } else {
+                if (animTime >= animMaxTime) animTime = 0;
+                startAnim();
+            }
+        });
+
+        document.getElementById("rlTimeline").addEventListener("input", function() {
+            animTime = parseFloat(this.value);
+            if (animPlaying) stopAnim();
+            updateMarkers();
+        });
+
+        document.getElementById("rlSpeedSelect").addEventListener("change", function() {
+            animSpeed = parseFloat(this.value);
+        });
+
+        // Lap/session checkbox handlers
         document.querySelectorAll(".rl-session-check").forEach(function(cb) {
             cb.addEventListener("change", renderRaceline);
         });

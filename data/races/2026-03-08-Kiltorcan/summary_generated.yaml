@@ -1,4 +1,4 @@
-generated: '2026-03-11T07:15:42'
+generated: '2026-03-31T16:04:38'
 total_laps: 25
 clean_laps: 23
 excluded_laps:
@@ -28,8 +28,8 @@ max_braking_g: 0.6
 max_acceleration_g: 0.18
 weather:
   condition: Overcast
-  temp_c: 9.8
-  wind_kmh: 19.4
+  temp_c: 9.9
+  wind_kmh: 19.2
   wind_direction_deg: 165
   wind_direction: S
   weathercode: 3
