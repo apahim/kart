@@ -1,9 +1,8 @@
-"""Track map visualizations using Plotly."""
+"""Track map data preparation for MapKit JS rendering."""
 
 import numpy as np
-import plotly.graph_objects as go
 
-from scripts.analysis.utils import project_to_meters, detect_corners_with_positions, add_wind_arrow
+from scripts.analysis.utils import detect_corners_with_positions, wind_data
 
 
 def _get_coords(df):
@@ -18,48 +17,18 @@ def _get_coords(df):
     return lat_col, lon_col
 
 
-def _add_corner_annotations(fig, corners_info, lat, lon):
-    """Add corner label annotations to a track map figure."""
-    if not corners_info:
-        return
-
-    x_m, y_m = project_to_meters(lat, lon)
-
-    for corner in corners_info:
-        if "lat" in corner and "lon" in corner:
-            cx, cy = project_to_meters(
-                np.array([corner["lat"]]), np.array([corner["lon"]])
-            )
-            # Use same projection center as the main data
-            lat_mean = np.mean(lat)
-            lon_mean = np.mean(lon)
-            lat_mean_rad = np.radians(lat_mean)
-            cx = (corner["lon"] - lon_mean) * 111320 * np.cos(lat_mean_rad)
-            cy = (corner["lat"] - lat_mean) * 110540
-
-            fig.add_annotation(
-                x=cx, y=cy,
-                text=f"<b>{corner['label']}</b>",
-                showarrow=False,
-                font=dict(size=11, color="black"),
-                bgcolor="rgba(255,255,255,0.7)",
-                bordercolor="black",
-                borderwidth=1,
-                borderpad=2,
-            )
-
-
-def _hide_axes(fig):
-    """Hide axis labels, ticks, and gridlines for clean track maps."""
-    axis_opts = dict(
-        showticklabels=False, showgrid=False, zeroline=False,
-        title="",
-    )
-    fig.update_layout(xaxis=axis_opts, yaxis=axis_opts)
+def _corners_list(df, best_lap=None, track_corners=None):
+    """Get corner label data as a list of dicts with label, lat, lon."""
+    corners_info = detect_corners_with_positions(df, best_lap=best_lap, track_corners=track_corners)
+    return [
+        {"label": c["label"], "lat": c["lat"], "lon": c["lon"]}
+        for c in corners_info
+        if "lat" in c and "lon" in c
+    ]
 
 
 def create_speed_track_map(df, best_lap=None, weather=None, track_corners=None):
-    """Create a track map colored by speed using meters projection."""
+    """Prepare speed track map data for MapKit JS rendering."""
     lat_col, lon_col = _get_coords(df)
     if not lat_col or not lon_col:
         return None
@@ -74,46 +43,27 @@ def create_speed_track_map(df, best_lap=None, weather=None, track_corners=None):
         plot_df = df.copy()
 
     plot_df = plot_df.dropna(subset=[lat_col, lon_col, speed_col])
-    speed_kmh = plot_df[speed_col] * 3.6
+    speed_kmh = (plot_df[speed_col] * 3.6).values
 
-    x_m, y_m = project_to_meters(plot_df[lat_col].values, plot_df[lon_col].values)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=x_m,
-        y=y_m,
-        mode="markers",
-        marker=dict(
-            size=5,
-            color=speed_kmh,
-            colorscale="RdYlGn",
-            colorbar=dict(title="km/h"),
-            showscale=True,
-        ),
-        hovertemplate="Speed: %{marker.color:.1f} km/h<extra></extra>",
-    ))
-
-    corners_info = detect_corners_with_positions(df, best_lap=best_lap, track_corners=track_corners)
-    _add_corner_annotations(fig, corners_info, plot_df[lat_col].values, plot_df[lon_col].values)
-
-    fig.update_layout(
-        title="Track Map - Speed",
-        xaxis=dict(scaleanchor="y", scaleratio=1),
-        yaxis=dict(),
-        template="plotly_white",
-        height=500,
-    )
-    _hide_axes(fig)
-    add_wind_arrow(fig, weather)
-
-    return fig
+    return {
+        "title": "Track Map - Speed",
+        "lat": [round(float(v), 6) for v in plot_df[lat_col].values],
+        "lon": [round(float(v), 6) for v in plot_df[lon_col].values],
+        "values": [round(float(v), 1) for v in speed_kmh],
+        "colorscale": "RdYlGn",
+        "colorbar": {
+            "title": "km/h",
+            "min": round(float(np.nanmin(speed_kmh)), 1),
+            "max": round(float(np.nanmax(speed_kmh)), 1),
+        },
+        "cmid": None,
+        "corners": _corners_list(df, best_lap=best_lap, track_corners=track_corners),
+        "wind": wind_data(weather),
+    }
 
 
 def create_sector_delta_map(df, best_lap, sector_data, weather=None, track_corners=None):
-    """Create a track map of the best lap color-coded by sector time delta.
-
-    Green where the best lap matches/beats the best sector time, red where slower.
-    """
+    """Prepare sector delta track map data for MapKit JS rendering."""
     if sector_data is None:
         return None
 
@@ -137,8 +87,6 @@ def create_sector_delta_map(df, best_lap, sector_data, weather=None, track_corne
     if len(lap_data) < 20:
         return None
 
-    x_m, y_m = project_to_meters(lap_data[lat_col].values, lap_data[lon_col].values)
-
     dist = lap_data["distance_traveled"].values
     dist_norm = dist - dist[0]
     lap_length = dist_norm[-1]
@@ -148,56 +96,35 @@ def create_sector_delta_map(df, best_lap, sector_data, weather=None, track_corne
 
     best_lap_sectors = sector_times_dict[best_lap]
     n_sectors = len(best_sectors)
-    headers = sector_data.get("headers", [f"S{i+1}" for i in range(n_sectors)])
 
-    # Compute delta per point based on which sector it belongs to
     deltas = np.zeros(len(frac))
-    sector_labels = []
     for i in range(len(frac)):
         for si in range(n_sectors):
             if frac[i] >= sector_boundaries[si] and frac[i] <= sector_boundaries[si + 1]:
                 deltas[i] = best_lap_sectors[si] - best_sectors[si]
-                sector_labels.append(f"{headers[si]}: {deltas[i]:+.3f}s")
                 break
-        else:
-            sector_labels.append("")
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=x_m,
-        y=y_m,
-        mode="markers",
-        marker=dict(
-            size=5,
-            color=deltas,
-            colorscale="RdYlGn_r",
-            cmin=0,
-            cmax=max(abs(deltas.max()), 0.01),
-            colorbar=dict(title="Delta (s)"),
-            showscale=True,
-        ),
-        text=sector_labels,
-        hovertemplate="%{text}<extra></extra>",
-    ))
+    delta_max = max(abs(float(deltas.max())), 0.01)
 
-    corners_info = detect_corners_with_positions(df, best_lap=best_lap, track_corners=track_corners)
-    _add_corner_annotations(fig, corners_info, lap_data[lat_col].values, lap_data[lon_col].values)
-
-    fig.update_layout(
-        title="Track Map - Sector Delta (Best Lap vs Best Sectors)",
-        xaxis=dict(scaleanchor="y", scaleratio=1),
-        yaxis=dict(),
-        template="plotly_white",
-        height=500,
-    )
-    _hide_axes(fig)
-    add_wind_arrow(fig, weather)
-
-    return fig
+    return {
+        "title": "Track Map - Sector Delta (Best Lap vs Best Sectors)",
+        "lat": [round(float(v), 6) for v in lap_data[lat_col].values],
+        "lon": [round(float(v), 6) for v in lap_data[lon_col].values],
+        "values": [round(float(v), 3) for v in deltas],
+        "colorscale": "RdYlGn_r",
+        "colorbar": {
+            "title": "Delta (s)",
+            "min": 0.0,
+            "max": round(delta_max, 3),
+        },
+        "cmid": None,
+        "corners": _corners_list(df, best_lap=best_lap, track_corners=track_corners),
+        "wind": wind_data(weather),
+    }
 
 
 def create_lateral_g_track_map(df, best_lap=None, weather=None, track_corners=None):
-    """Create a track map colored by lateral G-force using meters projection."""
+    """Prepare lateral G track map data for MapKit JS rendering."""
     lat_col, lon_col = _get_coords(df)
     if not lat_col or not lon_col:
         return None
@@ -211,36 +138,20 @@ def create_lateral_g_track_map(df, best_lap=None, weather=None, track_corners=No
         plot_df = df.copy()
 
     plot_df = plot_df.dropna(subset=[lat_col, lon_col, "lateral_acc"])
+    lat_g = plot_df["lateral_acc"].values
 
-    x_m, y_m = project_to_meters(plot_df[lat_col].values, plot_df[lon_col].values)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=x_m,
-        y=y_m,
-        mode="markers",
-        marker=dict(
-            size=5,
-            color=plot_df["lateral_acc"],
-            colorscale="RdYlBu",
-            cmid=0,
-            colorbar=dict(title="Lateral G"),
-            showscale=True,
-        ),
-        hovertemplate="Lateral G: %{marker.color:.2f}<extra></extra>",
-    ))
-
-    corners_info = detect_corners_with_positions(df, best_lap=best_lap, track_corners=track_corners)
-    _add_corner_annotations(fig, corners_info, plot_df[lat_col].values, plot_df[lon_col].values)
-
-    fig.update_layout(
-        title="Track Map - Lateral G",
-        xaxis=dict(scaleanchor="y", scaleratio=1),
-        yaxis=dict(),
-        template="plotly_white",
-        height=500,
-    )
-    _hide_axes(fig)
-    add_wind_arrow(fig, weather)
-
-    return fig
+    return {
+        "title": "Track Map - Lateral G",
+        "lat": [round(float(v), 6) for v in plot_df[lat_col].values],
+        "lon": [round(float(v), 6) for v in plot_df[lon_col].values],
+        "values": [round(float(v), 3) for v in lat_g],
+        "colorscale": "RdYlBu",
+        "colorbar": {
+            "title": "Lateral G",
+            "min": round(float(np.nanmin(lat_g)), 2),
+            "max": round(float(np.nanmax(lat_g)), 2),
+        },
+        "cmid": 0.0,
+        "corners": _corners_list(df, best_lap=best_lap, track_corners=track_corners),
+        "wind": wind_data(weather),
+    }

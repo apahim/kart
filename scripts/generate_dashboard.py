@@ -17,12 +17,12 @@ from scripts.analysis.outliers import filter_non_race_laps
 from scripts.analysis.summary import generate_summary, write_summary
 from scripts.analysis.tracks import load_track_coords, load_track_corners, auto_detect_corners
 from scripts.analysis.weather import fetch_weather
-from scripts.analysis.utils import format_laptime, safe_chart
+from scripts.analysis.utils import format_laptime, safe_chart, safe_map_data
 from scripts.analysis.laptimes import (
     create_laptime_bar_chart,
     create_delta_to_best_chart,
 )
-from scripts.analysis.track_map import create_speed_track_map, create_sector_delta_map
+from scripts.analysis.track_map import create_speed_track_map, create_sector_delta_map, create_lateral_g_track_map
 from scripts.analysis.speed import (
     create_cumulative_time_delta,
     create_throttle_brake_phases,
@@ -34,11 +34,19 @@ from scripts.analysis.braking import create_braking_track_map, create_braking_co
 from scripts.analysis.sectors import create_sector_times_table
 from scripts.analysis.coaching import generate_coaching_summary
 from scripts.analysis.evolution import prepare_raceline_data
+from scripts.apple_token import load_mapkit_token
 
 
 def main(race_dir):
     race_dir = race_dir.rstrip("/")
     race_name = os.path.basename(race_dir)
+
+    # Load MapKit JS token
+    try:
+        mapkit_token = load_mapkit_token()
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Warning: MapKit JS disabled — {e}")
+        mapkit_token = None
 
     # Load data
     metadata = load_race_metadata(race_dir)
@@ -97,9 +105,14 @@ def main(race_dir):
     if track_corners:
         print(f"Using {len(track_corners)} track-defined corners for {track_name}")
 
+    # Map data (rendered by MapKit JS in the template)
+    maps = {}
     if telemetry_df is not None:
-        charts["speed_track_map"] = safe_chart("speed_track_map", create_speed_track_map, telemetry_df, best_lap=best_lap, weather=weather, track_corners=track_corners)
-        charts["braking_map"] = safe_chart("braking_map", create_braking_track_map, telemetry_df, best_lap=best_lap, weather=weather, track_corners=track_corners)
+        maps["speed_track_map"] = safe_map_data("speed_track_map", create_speed_track_map, telemetry_df, best_lap=best_lap, weather=weather, track_corners=track_corners)
+        maps["braking_map"] = safe_map_data("braking_map", create_braking_track_map, telemetry_df, best_lap=best_lap, weather=weather, track_corners=track_corners)
+
+
+        # Non-map Plotly charts
         charts["braking_consistency"] = safe_chart("braking_consistency", create_braking_consistency_chart, telemetry_df, laptimes_df, track_corners=track_corners)
         charts["cumulative_delta"] = safe_chart("cumulative_delta", create_cumulative_time_delta, telemetry_df, laptimes_df, track_corners=track_corners)
         charts["corner_time_loss"] = safe_chart("corner_time_loss", create_corner_time_loss_chart, telemetry_df, laptimes_df, track_corners=track_corners)
@@ -111,7 +124,7 @@ def main(race_dir):
             sector_data = None
 
     if sector_data:
-        charts["sector_delta_map"] = safe_chart(
+        maps["sector_delta_map"] = safe_map_data(
             "sector_delta_map", create_sector_delta_map,
             telemetry_df, best_lap, sector_data,
             weather=weather, track_corners=track_corners,
@@ -149,6 +162,8 @@ def main(race_dir):
         metadata=metadata,
         summary=summary,
         charts=charts,
+        maps=maps,
+        mapkit_token=mapkit_token,
         coaching=coaching,
         sector_data=sector_data,
         raceline_data=raceline_data,

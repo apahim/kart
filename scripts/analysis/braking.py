@@ -4,19 +4,13 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from scripts.analysis.utils import project_to_meters, detect_corners_with_positions, add_wind_arrow
+from scripts.analysis.utils import detect_corners_with_positions, wind_data
+from scripts.analysis.track_map import _get_coords, _corners_list
 
 
 def create_braking_track_map(df, best_lap=None, weather=None, track_corners=None):
-    """Create a track map colored by longitudinal G (braking/acceleration)."""
-    lat_col = lon_col = None
-    for col in df.columns:
-        cl = col.lower()
-        if "latitude" in cl:
-            lat_col = col
-        if "longitude" in cl:
-            lon_col = col
-
+    """Prepare braking track map data for MapKit JS rendering."""
+    lat_col, lon_col = _get_coords(df)
     if not lat_col or not lon_col:
         return None
     if "longitudinal_acc" not in df.columns:
@@ -28,58 +22,25 @@ def create_braking_track_map(df, best_lap=None, weather=None, track_corners=None
         plot_df = df.copy()
 
     plot_df = plot_df.dropna(subset=[lat_col, lon_col, "longitudinal_acc"])
-
-    x_m, y_m = project_to_meters(plot_df[lat_col].values, plot_df[lon_col].values)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=x_m,
-        y=y_m,
-        mode="markers",
-        marker=dict(
-            size=5,
-            color=plot_df["longitudinal_acc"],
-            colorscale="RdYlGn",
-            cmid=0,
-            colorbar=dict(title="Long. G"),
-            showscale=True,
-        ),
-        hovertemplate="Long G: %{marker.color:.2f}<extra></extra>",
-    ))
-
-    corners_info = detect_corners_with_positions(df, best_lap=best_lap, track_corners=track_corners)
-    if corners_info:
-        lat_mean = np.mean(plot_df[lat_col].values)
-        lon_mean = np.mean(plot_df[lon_col].values)
-        lat_mean_rad = np.radians(lat_mean)
-        for corner in corners_info:
-            if "lat" in corner and "lon" in corner:
-                cx = (corner["lon"] - lon_mean) * 111320 * np.cos(lat_mean_rad)
-                cy = (corner["lat"] - lat_mean) * 110540
-                fig.add_annotation(
-                    x=cx, y=cy,
-                    text=f"<b>{corner['label']}</b>",
-                    showarrow=False,
-                    font=dict(size=11, color="black"),
-                    bgcolor="rgba(255,255,255,0.7)",
-                    bordercolor="black",
-                    borderwidth=1,
-                    borderpad=2,
-                )
+    long_g = plot_df["longitudinal_acc"].values
 
     title = f"Braking & Acceleration (Lap {best_lap})" if best_lap else "Braking & Acceleration"
-    axis_opts = dict(showticklabels=False, showgrid=False, zeroline=False, title="")
-    fig.update_layout(
-        title=title,
-        xaxis=dict(scaleanchor="y", scaleratio=1, **axis_opts),
-        yaxis=axis_opts,
-        template="plotly_white",
-        height=500,
-    )
 
-    add_wind_arrow(fig, weather)
-
-    return fig
+    return {
+        "title": title,
+        "lat": [round(float(v), 6) for v in plot_df[lat_col].values],
+        "lon": [round(float(v), 6) for v in plot_df[lon_col].values],
+        "values": [round(float(v), 3) for v in long_g],
+        "colorscale": "RdYlGn",
+        "colorbar": {
+            "title": "Long. G",
+            "min": round(float(np.nanmin(long_g)), 2),
+            "max": round(float(np.nanmax(long_g)), 2),
+        },
+        "cmid": 0.0,
+        "corners": _corners_list(df, best_lap=best_lap, track_corners=track_corners),
+        "wind": wind_data(weather),
+    }
 
 
 def create_braking_consistency_chart(df, laptimes_df=None, time_col="seconds", track_corners=None):

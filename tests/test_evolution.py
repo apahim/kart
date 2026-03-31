@@ -85,8 +85,8 @@ class TestPrepareRacelineData:
         assert result is not None
         for session in result["sessions"]:
             for lap in session["laps"]:
-                assert len(lap["x"]) <= 200
-                assert len(lap["y"]) <= 200
+                assert len(lap["lat"]) <= 200
+                assert len(lap["lon"]) <= 200
 
     def test_no_gps_excluded(self, tmp_path):
         _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack", has_gps=False)
@@ -110,10 +110,10 @@ class TestPrepareRacelineData:
         assert "seconds" in lap
         assert "is_best" in lap
         assert "is_outlier" in lap
-        assert "x" in lap
-        assert "y" in lap
+        assert "lat" in lap
+        assert "lon" in lap
         assert "t" in lap
-        assert len(lap["t"]) == len(lap["x"])
+        assert len(lap["t"]) == len(lap["lat"])
 
     def test_has_best_lap(self, tmp_path):
         _create_race_dir(str(tmp_path), "2026-03-08-TestTrack", "TestTrack", n_laps=5)

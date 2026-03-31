@@ -9,7 +9,7 @@ import yaml
 
 from scripts.load_data import extract_laptimes_from_telemetry, load_telemetry
 from scripts.analysis.outliers import filter_non_race_laps, detect_outliers
-from scripts.analysis.utils import project_to_meters, format_laptime
+from scripts.analysis.utils import format_laptime
 
 
 def load_all_races(data_dir="data/races"):
@@ -147,28 +147,6 @@ def prepare_raceline_data(track_name, current_race_dir, data_dir="data/races"):
     if not matching_dirs:
         return None
 
-    # Compute shared projection center from the current race's best lap
-    center = None
-    for race_dir, meta in matching_dirs:
-        if os.path.basename(race_dir) == current_race_name:
-            tel = load_telemetry(race_dir)
-            if tel is not None:
-                lat_col, lon_col = _find_gps_cols(tel)
-                if lat_col and lon_col:
-                    laps = extract_laptimes_from_telemetry(tel)
-                    laps = filter_non_race_laps(laps)
-                    if not laps.empty and "seconds" in laps.columns:
-                        clean, _ = detect_outliers(laps)
-                        if not clean.empty:
-                            best_lap = int(clean.loc[clean["seconds"].idxmin(), "lap"])
-                            lap_data = tel[tel["lap_number"] == best_lap].dropna(subset=[lat_col, lon_col])
-                            if len(lap_data) >= 20:
-                                center = (
-                                    float(np.mean(lap_data[lat_col].values)),
-                                    float(np.mean(lap_data[lon_col].values)),
-                                )
-            break
-
     sessions = []
     for race_dir, meta in matching_dirs:
         race_name = os.path.basename(race_dir)
@@ -203,7 +181,6 @@ def prepare_raceline_data(track_name, current_race_dir, data_dir="data/races"):
 
             lat_vals = lap_data[lat_col].values
             lon_vals = lap_data[lon_col].values
-            x_m, y_m = project_to_meters(lat_vals, lon_vals, center=center)
 
             # Extract elapsed time within lap (zero-based)
             t_vals = None
@@ -212,10 +189,10 @@ def prepare_raceline_data(track_name, current_race_dir, data_dir="data/races"):
                 t_vals = t_vals - t_vals[0]
 
             # Downsample to ~200 points
-            if len(x_m) > 200:
-                indices = np.linspace(0, len(x_m) - 1, 200, dtype=int)
-                x_m = x_m[indices]
-                y_m = y_m[indices]
+            if len(lat_vals) > 200:
+                indices = np.linspace(0, len(lat_vals) - 1, 200, dtype=int)
+                lat_vals = lat_vals[indices]
+                lon_vals = lon_vals[indices]
                 if t_vals is not None:
                     t_vals = t_vals[indices]
 
@@ -228,8 +205,8 @@ def prepare_raceline_data(track_name, current_race_dir, data_dir="data/races"):
                 "seconds": round(seconds, 3),
                 "is_best": lap_num == best_lap_num,
                 "is_outlier": is_outlier,
-                "x": [round(float(v), 2) for v in x_m],
-                "y": [round(float(v), 2) for v in y_m],
+                "lat": [round(float(v), 6) for v in lat_vals],
+                "lon": [round(float(v), 6) for v in lon_vals],
                 "t": [round(float(v), 3) for v in t_vals] if t_vals is not None else None,
             })
 

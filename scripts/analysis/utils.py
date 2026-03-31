@@ -80,6 +80,31 @@ def safe_chart(name, func, *args, **kwargs):
         return None
 
 
+def safe_map_data(name, func, *args, **kwargs):
+    """Call a map data function, returning None on error instead of crashing."""
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        print(f"Warning: map data '{name}' failed: {e}")
+        traceback.print_exc()
+        return None
+
+
+def wind_data(weather):
+    """Extract wind info dict from weather data for map overlays.
+
+    Returns dict with arrow_deg, cardinal, speed_kmh or None.
+    """
+    if not weather:
+        return None
+    speed = weather.get("wind_kmh")
+    deg = weather.get("wind_direction_deg")
+    cardinal = weather.get("wind_direction", "")
+    if speed is None or deg is None:
+        return None
+    return {"arrow_deg": deg, "cardinal": cardinal, "speed_kmh": speed}
+
+
 def format_laptime(seconds):
     """Format lap time from seconds to M:SS.mmm (e.g., 69.742 -> 1:09.742)."""
     minutes = int(seconds // 60)

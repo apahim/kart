@@ -5,3 +5,4 @@ scipy
 jinja2
 pyyaml
 pytest
+PyJWT[crypto]

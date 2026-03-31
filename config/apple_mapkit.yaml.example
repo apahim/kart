@@ -1,0 +1,10 @@
+# Apple MapKit JS credentials
+# 1. Go to https://developer.apple.com/account/resources/identifiers/list/maps
+# 2. Create a Maps Identifier
+# 3. Create a private key with MapKit JS enabled
+# 4. Download the .p8 key file and place it in this directory
+# 5. Copy this file to apple_mapkit.yaml and fill in your values
+
+team_id: "XXXXXXXXXX"
+key_id: "YYYYYYYYYY"
+private_key_path: "config/AuthKey_YYYYYYYYYY.p8"

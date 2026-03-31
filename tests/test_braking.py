@@ -6,14 +6,18 @@ from scripts.analysis.braking import create_braking_track_map, create_braking_co
 
 
 class TestBrakingMap:
-    def test_returns_figure(self, telemetry_df):
-        fig = create_braking_track_map(telemetry_df, best_lap=1)
-        assert isinstance(fig, go.Figure)
+    def test_returns_dict(self, telemetry_df):
+        result = create_braking_track_map(telemetry_df, best_lap=1)
+        assert isinstance(result, dict)
+        assert "lat" in result
+        assert "lon" in result
+        assert "values" in result
+        assert "colorscale" in result
+        assert "colorbar" in result
 
-    def test_axes_hidden(self, telemetry_df):
-        fig = create_braking_track_map(telemetry_df, best_lap=1)
-        assert fig.layout.xaxis.showticklabels is False
-        assert fig.layout.yaxis.showticklabels is False
+    def test_data_lengths_match(self, telemetry_df):
+        result = create_braking_track_map(telemetry_df, best_lap=1)
+        assert len(result["lat"]) == len(result["lon"]) == len(result["values"])
 
     def test_no_latlon(self, telemetry_df_minimal):
         result = create_braking_track_map(telemetry_df_minimal)
