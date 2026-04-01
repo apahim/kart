@@ -244,10 +244,10 @@
     <p class="section-desc">A/B comparison of two racing lines. Lap A (green) is from this session, Lap B (blue) can be from any session.</p>
 
     <div class="card p-3 mb-2">
-        <div class="d-flex flex-wrap align-items-end gap-3">
-            <div>
+        <div class="d-flex flex-wrap align-items-end gap-2 gap-md-3">
+            <div style="min-width: 0; flex: 1 1 140px; max-width: 220px;">
                 <label for="rlSelectA" class="form-label fw-semibold mb-1" style="font-size: 0.85rem; color: #22c55e;">Lap A</label>
-                <select id="rlSelectA" class="form-select form-select-sm" style="border-left: 3px solid #22c55e; min-width: 180px;">
+                <select id="rlSelectA" class="form-select form-select-sm" style="border-left: 3px solid #22c55e;">
                     {% for session in raceline_data.sessions %}
                     {% if session.is_current %}
                     {% set si = loop.index0 %}
@@ -261,18 +261,18 @@
                 </select>
             </div>
             <div class="d-flex align-items-end" style="padding-bottom: 2px;">
-                <button id="rlSwapBtn" class="btn btn-sm btn-outline-secondary" title="Swap A and B" style="font-size: 0.75rem;" disabled>&#8644; Swap</button>
+                <button id="rlSwapBtn" class="btn btn-sm btn-outline-secondary" title="Swap A and B" style="font-size: 0.75rem;" disabled>&#8644;</button>
             </div>
-            <div>
+            <div style="min-width: 0; flex: 2 1 280px;">
                 <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem; color: #3b82f6;">Lap B</label>
-                <div class="d-flex gap-1">
-                    <select id="rlSelectBSession" class="form-select form-select-sm" style="border-left: 3px solid #3b82f6; width: auto;">
+                <div class="d-flex flex-column flex-sm-row gap-1">
+                    <select id="rlSelectBSession" class="form-select form-select-sm" style="border-left: 3px solid #3b82f6;">
                         <option value="">&mdash; Session &mdash;</option>
                         {% for session in raceline_data.sessions %}
                         <option value="{{ loop.index0 }}">{{ session.date }}{% if session.session_type %} &mdash; {{ session.session_type }}{% endif %}{% if session.is_current %} (current){% endif %}</option>
                         {% endfor %}
                     </select>
-                    <select id="rlSelectB" class="form-select form-select-sm" style="border-left: 3px solid #3b82f6; min-width: 180px;" disabled>
+                    <select id="rlSelectB" class="form-select form-select-sm" style="border-left: 3px solid #3b82f6;" disabled>
                         <option value="">&mdash; Lap &mdash;</option>
                     </select>
                 </div>
