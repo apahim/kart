@@ -123,6 +123,32 @@ def create_sector_delta_map(df, best_lap, sector_data, weather=None, track_corne
     }
 
 
+def create_all_laps_speed_map(df, clean_laps, weather=None, track_corners=None):
+    """Generate speed track map data for each clean lap.
+
+    Returns dict {lap_number: map_data_dict}.
+    """
+    result = {}
+    for lap in clean_laps:
+        data = create_speed_track_map(df, best_lap=lap, weather=weather, track_corners=track_corners)
+        if data is not None:
+            result[lap] = data
+    return result
+
+
+def create_all_laps_sector_delta_map(df, clean_laps, sector_data, weather=None, track_corners=None):
+    """Generate sector delta map data for each clean lap.
+
+    Returns dict {lap_number: map_data_dict}.
+    """
+    result = {}
+    for lap in clean_laps:
+        data = create_sector_delta_map(df, lap, sector_data, weather=weather, track_corners=track_corners)
+        if data is not None:
+            result[lap] = data
+    return result
+
+
 def create_lateral_g_track_map(df, best_lap=None, weather=None, track_corners=None):
     """Prepare lateral G track map data for MapKit JS rendering."""
     lat_col, lon_col = _get_coords(df)

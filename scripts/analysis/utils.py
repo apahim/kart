@@ -70,6 +70,17 @@ def fig_to_html(fig):
     return _BDATA_RE.sub(_decode_bdata, html)
 
 
+def fig_to_json(fig):
+    """Convert a Plotly figure to a JSON-serialisable dict (data + layout).
+
+    Used for charts that are rendered client-side via Plotly.react().
+    """
+    if fig is None:
+        return None
+    apply_mobile_layout(fig)
+    return json.loads(fig.to_json())
+
+
 def safe_chart(name, func, *args, **kwargs):
     """Call a chart function, returning None on error instead of crashing."""
     try:

@@ -33,7 +33,7 @@
         .action-icon.check { background-color: #2ecc71; color: white; }
 
         /* MapKit JS map containers */
-        .mapkit-wrap { position: relative; height: 500px; border-radius: 4px; overflow: hidden; }
+        .mapkit-wrap { position: relative; height: 600px; border-radius: 4px; overflow: hidden; }
         .mapkit-wrap .mk-map { width: 100%; height: 100%; }
         .mapkit-wrap canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
         .mapkit-wrap .corner-label { position: absolute; background: rgba(0,0,0,0.7); color: white; padding: 1px 5px; border-radius: 3px; font-size: 11px; font-weight: bold; border: 1px solid white; white-space: nowrap; z-index: 5; pointer-events: none; transform: translate(-50%, -100%); }
@@ -61,12 +61,14 @@
             .metadata-badge { font-size: 0.75rem; }
             .action-plan .action-item { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
             .action-icon { width: 24px; height: 24px; font-size: 0.75rem; margin-right: 0.5rem; }
-            .mapkit-wrap { height: 350px; }
-            #racelineWrap { height: 350px; }
+            .mapkit-wrap { height: 400px; }
+            #racelineWrap { height: 400px; }
             .rl-selector { max-height: none !important; overflow-y: visible !important; }
             .accordion-button { font-size: 0.8rem !important; padding: 0.4rem 0.5rem !important; }
             .form-check { margin-bottom: 0.1rem; }
             .js-plotly-plot { min-height: 0 !important; }
+            #dashboardTabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            #dashboardTabs .nav-link { white-space: nowrap; font-size: 0.85rem; padding: 0.4rem 0.75rem; }
         }
     </style>
 </head>
@@ -101,6 +103,30 @@
         </div>
     </div>
 
+    <ul class="nav nav-tabs mt-1" id="dashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab" aria-controls="tab-overview" aria-selected="true">Session Overview</button>
+        </li>
+        {% if lap_deep_dive %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="deepdive-tab" data-bs-toggle="tab" data-bs-target="#tab-deepdive" type="button" role="tab" aria-controls="tab-deepdive" aria-selected="false">Lap Deep Dive</button>
+        </li>
+        {% endif %}
+        {% if raceline_data %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="raceline-tab" data-bs-toggle="tab" data-bs-target="#tab-raceline" type="button" role="tab" aria-controls="tab-raceline" aria-selected="false">Racing Line</button>
+        </li>
+        {% endif %}
+        {% if sector_data or charts.corner_time_loss or charts.braking_consistency %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="improve-tab" data-bs-toggle="tab" data-bs-target="#tab-improve" type="button" role="tab" aria-controls="tab-improve" aria-selected="false">Where to Improve</button>
+        </li>
+        {% endif %}
+    </ul>
+
+    <div class="tab-content" id="dashboardTabContent">
+
+    <div class="tab-pane fade show active" id="tab-overview" role="tabpanel" aria-labelledby="overview-tab">
     <!-- Section 1: Session Overview -->
     <h3 class="section-title">Session Overview</h3>
 
@@ -170,113 +196,94 @@
             <div class="card p-2">{{ charts.delta_to_best | safe }}</div>
         </div>
     </div>
+    </div><!-- /tab-overview -->
 
-    <!-- Section 2: Best Lap Deep Dive -->
-    {% if charts.cumulative_delta or charts.throttle_brake_phases or maps.speed_track_map or maps.braking_map or maps.sector_delta_map %}
-    <h3 class="section-title">Best Lap Deep Dive</h3>
-    <p class="section-desc">The track maps show speed and braking zones around the circuit. The green area in the delta trace shows where your best lap gained time vs the median. The throttle/brake phases show your inputs.</p>
-    {% if maps.speed_track_map or maps.braking_map or maps.sector_delta_map %}
+    <!-- Section 2: Lap Deep Dive -->
+    {% if lap_deep_dive %}
+    <div class="tab-pane fade" id="tab-deepdive" role="tabpanel" aria-labelledby="deepdive-tab">
+    <h3 class="section-title">Lap Deep Dive</h3>
+    <p class="section-desc">Track maps show speed and braking zones. The delta trace shows time gained/lost vs the median. The phases chart shows throttle/brake inputs.</p>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <label for="lapDeepDiveSelect" class="form-label mb-0 fw-bold" style="white-space: nowrap;">Select Lap:</label>
+        <select id="lapDeepDiveSelect" class="form-select" style="width: auto;">
+            {% for lap_info in lap_deep_dive.laps %}
+            <option value="{{ lap_info.lap }}" {% if lap_info.is_best %}selected{% endif %}>
+                Lap {{ lap_info.lap }} &mdash; {{ lap_info.time_fmt }}{% if lap_info.is_best %} (best){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
     <div class="row">
-        {% if maps.speed_track_map %}
         <div class="col-md-4">
             <div class="card p-2"><div class="mapkit-wrap" id="speedMapWrap"><div class="mk-map" id="speedMap"></div><canvas id="speedCanvas"></canvas></div></div>
         </div>
-        {% endif %}
-        {% if maps.braking_map %}
         <div class="col-md-4">
             <div class="card p-2"><div class="mapkit-wrap" id="brakingMapWrap"><div class="mk-map" id="brakingMap"></div><canvas id="brakingCanvas"></canvas></div></div>
         </div>
-        {% endif %}
-        {% if maps.sector_delta_map %}
         <div class="col-md-4">
             <div class="card p-2"><div class="mapkit-wrap" id="sectorMapWrap"><div class="mk-map" id="sectorMap"></div><canvas id="sectorCanvas"></canvas></div></div>
         </div>
-        {% endif %}
     </div>
-    {% endif %}
-    {% if charts.cumulative_delta %}
     <div class="row">
         <div class="col-12">
-            <div class="card p-2">{{ charts.cumulative_delta | safe }}</div>
+            <div class="card p-2"><div id="cumulativeDeltaDiv" style="width:100%;height:350px;"></div></div>
         </div>
     </div>
-    {% endif %}
-    {% if charts.throttle_brake_phases %}
     <div class="row">
         <div class="col-12">
-            <div class="card p-2">{{ charts.throttle_brake_phases | safe }}</div>
+            <div class="card p-2"><div id="throttleBrakeDiv" style="width:100%;height:400px;"></div></div>
         </div>
     </div>
-    {% endif %}
+    </div><!-- /tab-deepdive -->
     {% endif %}
 
     <!-- Section 3: Racing Line Comparison -->
     {% if raceline_data %}
+    <div class="tab-pane fade" id="tab-raceline" role="tabpanel" aria-labelledby="raceline-tab">
     <h3 class="section-title">Racing Line Comparison</h3>
-    <p class="section-desc">Compare racing lines across laps and sessions. Best laps from each session are pre-selected. Toggle individual laps to compare specific lines.</p>
+    <p class="section-desc">A/B comparison of two racing lines. Lap A (green) is from this session, Lap B (blue) can be from any session.</p>
 
-    <div class="row">
-        <div class="col-md-4 col-12 order-md-1 order-2">
-            <div class="card p-3 rl-selector" style="max-height: 580px; overflow-y: auto;">
-                <div class="accordion" id="racelineAccordion">
+    <div class="card p-3 mb-2">
+        <div class="d-flex flex-wrap align-items-end gap-3">
+            <div>
+                <label for="rlSelectA" class="form-label fw-semibold mb-1" style="font-size: 0.85rem; color: #22c55e;">Lap A</label>
+                <select id="rlSelectA" class="form-select form-select-sm" style="border-left: 3px solid #22c55e; min-width: 180px;">
                     {% for session in raceline_data.sessions %}
+                    {% if session.is_current %}
                     {% set si = loop.index0 %}
-                    {% set outlier_laps = session.laps | selectattr('is_outlier') | list %}
-                    {% set clean_laps = session.laps | rejectattr('is_outlier') | list %}
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button {% if not session.is_current %}collapsed{% endif %} py-2 ps-3" type="button" data-bs-toggle="collapse" data-bs-target="#rlSession{{ si }}" style="font-size: 0.85rem; background: none !important; box-shadow: none !important;">
-                                <span class="rl-session-dot" data-session="{{ si }}" style="width:10px;height:10px;border-radius:50%;flex-shrink:0;display:inline-block;margin-right:6px;"></span>
-                                {{ session.date }}{% if session.session_type %} &mdash; {{ session.session_type }}{% endif %}
-                            </button>
-                        </h2>
-                        <div id="rlSession{{ si }}" class="accordion-collapse collapse {% if session.is_current %}show{% endif %}" data-bs-parent="#racelineAccordion">
-                            <div class="accordion-body py-2 px-3">
-                                <div class="mb-1">
-                                    <a href="#" class="rl-toggle-all small" data-session="{{ si }}">All</a> /
-                                    <a href="#" class="rl-toggle-none small" data-session="{{ si }}">None</a> /
-                                    <a href="#" class="rl-toggle-best small" data-session="{{ si }}" data-count="3">Best 3</a> /
-                                    <a href="#" class="rl-toggle-best small" data-session="{{ si }}" data-count="5">Best 5</a>
-                                </div>
-                                {% for lap in session.laps %}
-                                {% if not lap.is_outlier %}
-                                <div class="form-check">
-                                    <input class="form-check-input rl-lap-check" type="checkbox" id="rl_s{{ si }}_l{{ loop.index0 }}" data-session="{{ si }}" data-lap="{{ loop.index0 }}" data-seconds="{{ lap.seconds }}" data-outlier="0" {% if lap.is_best and session.is_current %}checked{% endif %}>
-                                    <label class="form-check-label" for="rl_s{{ si }}_l{{ loop.index0 }}" style="font-size: 0.8rem;">
-                                        <span class="rl-lap-dot" data-session="{{ si }}" style="width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;"></span>
-                                        Lap {{ lap.lap }} &mdash; {{ lap.time_fmt }}{% if lap.is_best %} <span class="badge bg-success" style="font-size: 0.65rem;">best</span>{% endif %}
-                                    </label>
-                                </div>
-                                {% endif %}
-                                {% endfor %}
-                                {% if outlier_laps %}
-                                <div class="mt-1">
-                                    <a href="#" class="rl-outlier-toggle small text-muted" data-session="{{ si }}">{{ outlier_laps | length }} outlier{{ 's' if outlier_laps | length > 1 else '' }} &rsaquo;</a>
-                                </div>
-                                <div class="rl-outlier-group" data-session="{{ si }}" style="display:none;">
-                                    {% for lap in session.laps %}
-                                    {% if lap.is_outlier %}
-                                    <div class="form-check">
-                                        <input class="form-check-input rl-lap-check" type="checkbox" id="rl_s{{ si }}_l{{ loop.index0 }}" data-session="{{ si }}" data-lap="{{ loop.index0 }}" data-seconds="{{ lap.seconds }}" data-outlier="1">
-                                        <label class="form-check-label text-muted" for="rl_s{{ si }}_l{{ loop.index0 }}" style="font-size: 0.8rem;">
-                                            <span class="rl-lap-dot" data-session="{{ si }}" style="width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;"></span>
-                                            Lap {{ lap.lap }} &mdash; {{ lap.time_fmt }}
-                                        </label>
-                                    </div>
-                                    {% endif %}
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+                    {% for lap in session.laps %}
+                    {% if not lap.is_outlier %}
+                    <option value="{{ si }}-{{ loop.index0 }}" {% if lap.is_best %}selected{% endif %}>Lap {{ lap.lap }} &mdash; {{ lap.time_fmt }}{% if lap.is_best %} (best){% endif %}</option>
+                    {% endif %}
                     {% endfor %}
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="d-flex align-items-end" style="padding-bottom: 2px;">
+                <button id="rlSwapBtn" class="btn btn-sm btn-outline-secondary" title="Swap A and B" style="font-size: 0.75rem;" disabled>&#8644; Swap</button>
+            </div>
+            <div>
+                <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem; color: #3b82f6;">Lap B</label>
+                <div class="d-flex gap-1">
+                    <select id="rlSelectBSession" class="form-select form-select-sm" style="border-left: 3px solid #3b82f6; width: auto;">
+                        <option value="">&mdash; Session &mdash;</option>
+                        {% for session in raceline_data.sessions %}
+                        <option value="{{ loop.index0 }}">{{ session.date }}{% if session.session_type %} &mdash; {{ session.session_type }}{% endif %}{% if session.is_current %} (current){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <select id="rlSelectB" class="form-select form-select-sm" style="border-left: 3px solid #3b82f6; min-width: 180px;" disabled>
+                        <option value="">&mdash; Lap &mdash;</option>
+                    </select>
                 </div>
             </div>
+            <div id="rlDeltaDisplay" class="d-flex align-items-end" style="font-size: 0.85rem; font-variant-numeric: tabular-nums; padding-bottom: 4px;"></div>
         </div>
-        <div class="col-md-8 col-12 order-md-2 order-1">
+    </div>
+    <div class="row">
+        <div class="col-12">
             <div class="card p-2">
-                <div class="mapkit-wrap" id="racelineWrap" style="height: 500px;"><div class="mk-map" id="racelineMap"></div><canvas id="racelineCanvas"></canvas></div>
+                <div class="mapkit-wrap" id="racelineWrap" style="height: 600px;"><div class="mk-map" id="racelineMap"></div><canvas id="racelineCanvas"></canvas></div>
                 <div id="racelinePlayback" class="d-flex align-items-center gap-2 mt-2 px-2" style="font-size: 0.85rem;">
                     <button id="rlPlayBtn" class="btn btn-sm btn-outline-primary" title="Play/Pause" style="min-width: 36px;">&#9654;</button>
                     <input id="rlTimeline" type="range" class="form-range flex-grow-1" min="0" max="100" step="0.1" value="0" style="height: 20px;">
@@ -292,23 +299,26 @@
             </div>
         </div>
     </div>
+    </div><!-- /tab-raceline -->
     {% endif %}
 
     {% if mapkit_token %}
     <script>
     /* ===== MapKit JS Track Maps ===== */
     (function() {
-        var mapData = {
-            speed: {{ maps.speed_track_map | tojson if maps.speed_track_map else 'null' }},
-            braking: {{ maps.braking_map | tojson if maps.braking_map else 'null' }},
-            sector: {{ maps.sector_delta_map | tojson if maps.sector_delta_map else 'null' }},
-        };
+        {% if lap_deep_dive %}
+        var lapDeepDiveData = {{ lap_deep_dive | tojson }};
+        var bestLap = String(lapDeepDiveData.best_lap);
+        {% else %}
+        var lapDeepDiveData = null;
+        var bestLap = null;
+        {% endif %}
         {% if raceline_data %}
         var rlData = {{ raceline_data | tojson }};
         {% else %}
         var rlData = null;
         {% endif %}
-        var rlColors = ["#636EFA","#EF553B","#00CC96","#AB63FA","#FFA15A","#19D3F3","#FF6692","#B6E880","#FF97FF","#FECB52"];
+        var rlColorA = "#22c55e", rlColorB = "#3b82f6";
 
         // Colorscale definitions (RGB control points at fractions 0-1)
         var SCALES = {
@@ -465,42 +475,95 @@
         }
 
         function setupTrackMap(mapElId, canvasId, wrapId, data) {
-            if (!data) return;
+            if (!data) return null;
             var map = initSatMap(mapElId, data.lat, data.lon);
-            addTitle(wrapId, data.title);
-            addColorbar(wrapId, data);
-            var positionLabels = addCorners(map, data.corners, wrapId);
-            addWind(wrapId, data.wind);
-
             var canvas = document.getElementById(canvasId);
+            var wrap = document.getElementById(wrapId);
+            var currentData = data;
+
+            // Overlay elements container — everything except the map and canvas
+            var overlayContainer = document.createElement("div");
+            overlayContainer.className = "map-overlays";
+            wrap.appendChild(overlayContainer);
+
+            function addOverlayElements(d) {
+                // Clear previous overlay elements
+                overlayContainer.innerHTML = "";
+                // Title
+                var titleEl = document.createElement("div");
+                titleEl.className = "map-title";
+                titleEl.textContent = d.title;
+                overlayContainer.appendChild(titleEl);
+                // Colorbar
+                var cb = d.colorbar;
+                var stops = SCALES[d.colorscale] || SCALES.RdYlGn;
+                var gradStops = stops.map(function(s) { return s[1] + " " + (s[0]*100) + "%"; }).reverse();
+                var bar = document.createElement("div");
+                bar.className = "map-colorbar";
+                bar.style.background = "linear-gradient(to bottom," + gradStops.join(",") + ")";
+                bar.innerHTML = '<div class="cb-title">' + cb.title + '</div>'
+                    + '<div class="cb-label top">' + cb.max + '</div>'
+                    + '<div class="cb-label bottom">' + cb.min + '</div>';
+                if (d.cmid !== null && d.cmid !== undefined) {
+                    bar.innerHTML += '<div class="cb-label mid">' + d.cmid + '</div>';
+                }
+                overlayContainer.appendChild(bar);
+                // Corners
+                var labels = [];
+                if (d.corners) {
+                    d.corners.forEach(function(c) {
+                        var el = document.createElement("div");
+                        el.className = "corner-label";
+                        el.textContent = c.label;
+                        overlayContainer.appendChild(el);
+                        labels.push({ el: el, lat: c.lat, lon: c.lon });
+                    });
+                }
+                // Wind
+                if (d.wind) {
+                    var windEl = document.createElement("div");
+                    windEl.className = "map-wind";
+                    windEl.innerHTML = '<span class="arrow" style="display:inline-block;transform:rotate(' + d.wind.arrow_deg + 'deg)">&#8593;</span><br>' + d.wind.cardinal + " " + d.wind.speed_kmh + " km/h";
+                    overlayContainer.appendChild(windEl);
+                }
+                // Tooltip
+                var tooltip = document.createElement("div");
+                tooltip.className = "map-tooltip";
+                overlayContainer.appendChild(tooltip);
+                return { labels: labels, tooltip: tooltip };
+            }
+
+            var overlayState = addOverlayElements(data);
+            var screenPts = [];
+
+            function positionLabels() {
+                var rect = wrap.getBoundingClientRect();
+                overlayState.labels.forEach(function(lb) {
+                    var pt = map.convertCoordinateToPointOnPage(new mapkit.Coordinate(lb.lat, lb.lon));
+                    if (!pt) return;
+                    lb.el.style.left = (pt.x - window.scrollX - rect.left) + "px";
+                    lb.el.style.top = (pt.y - window.scrollY - rect.top - 8) + "px";
+                });
+            }
+
             function redraw() {
-                try { drawDots(canvas, map, data); }
+                try { drawDots(canvas, map, currentData); }
                 catch(e) { console.warn("drawDots error for " + mapElId + ":", e); }
-                if (positionLabels) positionLabels();
+                positionLabels();
+                screenPts = [];
             }
             map.addEventListener("region-change-end", redraw);
-            // Retry draws — map needs time to compute coordinate→page mapping
             [500, 1000, 2000, 4000].forEach(function(ms) { setTimeout(redraw, ms); });
             window.addEventListener("resize", redraw);
             window.addEventListener("scroll", function() { redraw(); });
 
             // Hover tooltip
-            var wrap = document.getElementById(wrapId);
-            var tooltip = document.createElement("div");
-            tooltip.className = "map-tooltip";
-            wrap.appendChild(tooltip);
             var unit = data.colorbar.title || "";
-
-            // Cache screen positions for hover; refresh on redraw
-            var screenPts = [];
-            var origRedraw = redraw;
-            redraw = function() { origRedraw(); screenPts = []; };
-            window.addEventListener("scroll", function() { screenPts = []; });
             function ensureScreenPts() {
                 if (screenPts.length > 0) return;
                 var rect = canvas.getBoundingClientRect();
-                for (var i = 0; i < data.lat.length; i++) {
-                    var pt = map.convertCoordinateToPointOnPage(new mapkit.Coordinate(data.lat[i], data.lon[i]));
+                for (var i = 0; i < currentData.lat.length; i++) {
+                    var pt = map.convertCoordinateToPointOnPage(new mapkit.Coordinate(currentData.lat[i], currentData.lon[i]));
                     if (pt) screenPts.push({ x: pt.x - window.scrollX - rect.left, y: pt.y - window.scrollY - rect.top, idx: i });
                 }
             }
@@ -515,23 +578,68 @@
                     if (d < bestDist) { bestDist = d; bestIdx = screenPts[i].idx; }
                 }
                 if (bestIdx >= 0) {
-                    tooltip.textContent = data.values[bestIdx] + " " + unit;
-                    tooltip.style.display = "block";
-                    tooltip.style.left = (e.clientX - rect.left + 12) + "px";
-                    tooltip.style.top = (e.clientY - rect.top - 10) + "px";
+                    overlayState.tooltip.textContent = currentData.values[bestIdx] + " " + unit;
+                    overlayState.tooltip.style.display = "block";
+                    overlayState.tooltip.style.left = (e.clientX - rect.left + 12) + "px";
+                    overlayState.tooltip.style.top = (e.clientY - rect.top - 10) + "px";
                 } else {
-                    tooltip.style.display = "none";
+                    overlayState.tooltip.style.display = "none";
                 }
             });
-            wrap.addEventListener("mouseleave", function() { tooltip.style.display = "none"; });
+            wrap.addEventListener("mouseleave", function() { overlayState.tooltip.style.display = "none"; });
+
+            return {
+                map: map,
+                update: function(newData) {
+                    if (!newData) return;
+                    currentData = newData;
+                    unit = newData.colorbar.title || "";
+                    overlayState = addOverlayElements(newData);
+                    screenPts = [];
+                    redraw();
+                }
+            };
         }
+
+        // Track map refs for lap switching
+        var speedMapRef = null, brakingMapRef = null, sectorMapRef = null;
 
         waitForMapKit(function() {
             mapkit.init({ authorizationCallback: function(done) { done("{{ mapkit_token }}"); } });
 
-            setupTrackMap("speedMap", "speedCanvas", "speedMapWrap", mapData.speed);
-            setupTrackMap("brakingMap", "brakingCanvas", "brakingMapWrap", mapData.braking);
-            setupTrackMap("sectorMap", "sectorCanvas", "sectorMapWrap", mapData.sector);
+            {% if lap_deep_dive %}
+            var initData = lapDeepDiveData;
+            speedMapRef = setupTrackMap("speedMap", "speedCanvas", "speedMapWrap", initData.speed_maps[bestLap] || null);
+            brakingMapRef = setupTrackMap("brakingMap", "brakingCanvas", "brakingMapWrap", initData.braking_maps[bestLap] || null);
+            sectorMapRef = setupTrackMap("sectorMap", "sectorCanvas", "sectorMapWrap", initData.sector_maps[bestLap] || null);
+
+            // Render initial Plotly charts
+            var initDelta = initData.cumulative_delta[bestLap];
+            if (initDelta) Plotly.react("cumulativeDeltaDiv", initDelta.data, initDelta.layout, {responsive: true});
+            var initPhases = initData.throttle_brake[bestLap];
+            if (initPhases) Plotly.react("throttleBrakeDiv", initPhases.data, initPhases.layout, {responsive: true});
+
+            // Lap selector change handler
+            document.getElementById("lapDeepDiveSelect").addEventListener("change", function() {
+                var lap = this.value;
+                if (speedMapRef) speedMapRef.update(initData.speed_maps[lap] || null);
+                if (brakingMapRef) brakingMapRef.update(initData.braking_maps[lap] || null);
+                if (sectorMapRef) sectorMapRef.update(initData.sector_maps[lap] || null);
+
+                var deltaData = initData.cumulative_delta[lap];
+                if (deltaData) {
+                    Plotly.react("cumulativeDeltaDiv", deltaData.data, deltaData.layout, {responsive: true});
+                } else {
+                    Plotly.purge("cumulativeDeltaDiv");
+                }
+                var phasesData = initData.throttle_brake[lap];
+                if (phasesData) {
+                    Plotly.react("throttleBrakeDiv", phasesData.data, phasesData.layout, {responsive: true});
+                } else {
+                    Plotly.purge("throttleBrakeDiv");
+                }
+            });
+            {% endif %}
 
             /* ===== Racing Line on MapKit JS ===== */
             {% if raceline_data %}
@@ -580,71 +688,87 @@
                     }
                 }
 
+                function parseLapRef(val) {
+                    if (!val) return null;
+                    var parts = val.split("-");
+                    var si = parseInt(parts[0]), li = parseInt(parts[1]);
+                    return rlData.sessions[si] ? rlData.sessions[si].laps[li] || null : null;
+                }
+
+                function parseLapSession(val) {
+                    if (!val) return null;
+                    return parseInt(val.split("-")[0]);
+                }
+
+                function addPolyline(lap, color, opacity) {
+                    var coords = lap.lat.map(function(lat, i) {
+                        return new mapkit.Coordinate(lat, lap.lon[i]);
+                    });
+                    var style = new mapkit.Style({ strokeColor: color, lineWidth: 3, strokeOpacity: opacity });
+                    var overlay = new mapkit.PolylineOverlay(coords, { style: style });
+                    rlOverlays.push(overlay);
+                    rlMap.addOverlay(overlay);
+                    if (lap.t && lap.t.length > 0) {
+                        markerMeta.push({lap: lap, color: color});
+                        var lapEnd = lap.t[lap.t.length - 1];
+                        if (lapEnd > animMaxTime) animMaxTime = lapEnd;
+                    }
+                }
+
                 function renderRaceline() {
                     stopAnim();
                     animTime = 0; animMaxTime = 0; markerMeta = [];
-                    // Remove old overlays
-                    if (rlMap) {
-                        rlMap.removeOverlays(rlOverlays);
-                    }
+                    if (rlMap) rlMap.removeOverlays(rlOverlays);
                     rlOverlays = [];
 
-                    // Collect all selected lat/lon for region fitting
-                    var allLat = [], allLon = [];
-                    var selectedLaps = [];
+                    var lapA = parseLapRef(document.getElementById("rlSelectA").value);
+                    var lapB = parseLapRef(document.getElementById("rlSelectB").value);
+                    if (!lapA) return;
 
-                    rlData.sessions.forEach(function(session, si) {
-                        var color = rlColors[si % rlColors.length];
-                        session.laps.forEach(function(lap, li) {
-                            var cb = document.getElementById("rl_s" + si + "_l" + li);
-                            if (!cb || !cb.checked) return;
-                            allLat = allLat.concat(lap.lat);
-                            allLon = allLon.concat(lap.lon);
-                            selectedLaps.push({session: session, lap: lap, color: color});
-                        });
-                    });
+                    var allLat = [].concat(lapA.lat), allLon = [].concat(lapA.lon);
+                    if (lapB) { allLat = allLat.concat(lapB.lat); allLon = allLon.concat(lapB.lon); }
 
-                    if (allLat.length === 0) return;
+                    if (!rlMap) rlMap = initSatMap("racelineMap", allLat, allLon);
 
-                    // Init map on first render
-                    if (!rlMap) {
-                        rlMap = initSatMap("racelineMap", allLat, allLon);
-                    }
+                    addPolyline(lapA, rlColorA, 1.0);
+                    if (lapB) addPolyline(lapB, rlColorB, 0.6);
 
-                    // Add polyline overlays and collect animation data
-                    selectedLaps.forEach(function(sl) {
-                        var coords = sl.lap.lat.map(function(lat, i) {
-                            return new mapkit.Coordinate(lat, sl.lap.lon[i]);
-                        });
-                        var style = new mapkit.Style({
-                            strokeColor: sl.color,
-                            lineWidth: sl.lap.is_best ? 3 : 1.5,
-                            strokeOpacity: sl.lap.is_best ? 1.0 : 0.5
-                        });
-                        var overlay = new mapkit.PolylineOverlay(coords, { style: style });
-                        rlOverlays.push(overlay);
-                        rlMap.addOverlay(overlay);
-
-                        if (sl.lap.t && sl.lap.t.length > 0) {
-                            markerMeta.push({lap: sl.lap, color: sl.color});
-                            var lapEnd = sl.lap.t[sl.lap.t.length - 1];
-                            if (lapEnd > animMaxTime) animMaxTime = lapEnd;
-                        }
-                    });
-
-                    // Build legend
+                    // Legend
                     var legendEl = document.getElementById("racelineLegend");
                     legendEl.innerHTML = "";
-                    selectedLaps.forEach(function(sl) {
+                    [{label: "Lap A", lap: lapA, color: rlColorA}, {label: "Lap B", lap: lapB, color: rlColorB}].forEach(function(entry) {
+                        if (!entry.lap) return;
                         var item = document.createElement("span");
                         item.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
                         var dot = document.createElement("span");
-                        dot.style.cssText = "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" + sl.color + ";opacity:" + (sl.lap.is_best ? "1" : "0.6") + ";";
-                        var txt = document.createTextNode(sl.lap.time_fmt);
+                        dot.style.cssText = "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" + entry.color + ";";
                         item.appendChild(dot);
-                        item.appendChild(txt);
+                        item.appendChild(document.createTextNode(entry.label + ": " + entry.lap.time_fmt));
                         legendEl.appendChild(item);
                     });
+
+                    // Delta display
+                    var deltaEl = document.getElementById("rlDeltaDisplay");
+                    if (lapA && lapB) {
+                        var delta = lapB.seconds - lapA.seconds;
+                        var absDelta = Math.abs(delta).toFixed(3);
+                        if (delta > 0.001) {
+                            deltaEl.innerHTML = '<span style="background:#22c55e22;color:#22c55e;padding:2px 8px;border-radius:12px;font-weight:600;">A faster by ' + absDelta + 's</span>';
+                        } else if (delta < -0.001) {
+                            deltaEl.innerHTML = '<span style="background:#3b82f622;color:#3b82f6;padding:2px 8px;border-radius:12px;font-weight:600;">B faster by ' + absDelta + 's</span>';
+                        } else {
+                            deltaEl.innerHTML = '<span style="background:#88888822;color:#888;padding:2px 8px;border-radius:12px;">Equal</span>';
+                        }
+                    } else {
+                        deltaEl.innerHTML = "";
+                    }
+
+                    // Swap button: only enabled when Lap B is from the current session
+                    var selB = document.getElementById("rlSelectB");
+                    var swapBtn = document.getElementById("rlSwapBtn");
+                    var bSessionVal = document.getElementById("rlSelectBSession").value;
+                    var bIsCurrent = bSessionVal !== "" && rlData.sessions[parseInt(bSessionVal)] && rlData.sessions[parseInt(bSessionVal)].is_current;
+                    swapBtn.disabled = !selB.value || !bIsCurrent;
 
                     var slider = document.getElementById("rlTimeline");
                     slider.max = animMaxTime > 0 ? animMaxTime.toFixed(1) : "100";
@@ -690,46 +814,57 @@
                 });
                 document.getElementById("rlSpeedSelect").addEventListener("change", function() { animSpeed = parseFloat(this.value); });
 
-                // Color-code session dots and lap dots
-                rlData.sessions.forEach(function(session, si) {
-                    var color = rlColors[si % rlColors.length];
-                    document.querySelectorAll('.rl-session-dot[data-session="' + si + '"]').forEach(function(el) { el.style.background = color; });
-                    document.querySelectorAll('.rl-lap-dot[data-session="' + si + '"]').forEach(function(el) { el.style.background = color; });
+                document.getElementById("rlSelectA").addEventListener("change", renderRaceline);
+                document.getElementById("rlSelectB").addEventListener("change", renderRaceline);
+
+                // Populate Lap B options when session changes
+                document.getElementById("rlSelectBSession").addEventListener("change", function() {
+                    var si = this.value;
+                    var selB = document.getElementById("rlSelectB");
+                    selB.innerHTML = '<option value="">&mdash; Lap &mdash;</option>';
+                    if (si === "") { selB.disabled = true; renderRaceline(); return; }
+                    var session = rlData.sessions[parseInt(si)];
+                    if (!session) { selB.disabled = true; renderRaceline(); return; }
+                    session.laps.forEach(function(lap, li) {
+                        if (lap.is_outlier) return;
+                        var opt = document.createElement("option");
+                        opt.value = si + "-" + li;
+                        opt.textContent = "Lap " + lap.lap + " \u2014 " + lap.time_fmt + (lap.is_best ? " (best)" : "");
+                        selB.appendChild(opt);
+                    });
+                    selB.disabled = false;
+                    renderRaceline();
                 });
 
-                document.querySelectorAll(".rl-lap-check").forEach(function(cb) { cb.addEventListener("change", renderRaceline); });
-                document.querySelectorAll(".rl-toggle-all").forEach(function(a) {
-                    a.addEventListener("click", function(e) { e.preventDefault(); var si = this.dataset.session;
-                        document.querySelectorAll('.rl-lap-check[data-session="' + si + '"][data-outlier="0"]').forEach(function(cb) { cb.checked = true; }); renderRaceline(); });
+                // Swap A and B (only when B is from current session)
+                document.getElementById("rlSwapBtn").addEventListener("click", function() {
+                    var selA = document.getElementById("rlSelectA");
+                    var selB = document.getElementById("rlSelectB");
+                    var tmp = selA.value;
+                    selA.value = selB.value;
+                    selB.value = tmp;
+                    renderRaceline();
                 });
-                document.querySelectorAll(".rl-toggle-none").forEach(function(a) {
-                    a.addEventListener("click", function(e) { e.preventDefault(); var si = this.dataset.session;
-                        document.querySelectorAll('.rl-lap-check[data-session="' + si + '"]').forEach(function(cb) { cb.checked = false; }); renderRaceline(); });
-                });
-                document.querySelectorAll(".rl-toggle-best").forEach(function(a) {
-                    a.addEventListener("click", function(e) {
-                        e.preventDefault();
-                        var si = this.dataset.session, count = parseInt(this.dataset.count);
-                        var cbs = Array.from(document.querySelectorAll('.rl-lap-check[data-session="' + si + '"][data-outlier="0"]'));
-                        cbs.sort(function(a, b) { return parseFloat(a.dataset.seconds) - parseFloat(b.dataset.seconds); });
-                        cbs.forEach(function(cb, i) { cb.checked = i < count; });
-                        document.querySelectorAll('.rl-lap-check[data-session="' + si + '"][data-outlier="1"]').forEach(function(cb) { cb.checked = false; });
-                        renderRaceline();
-                    });
-                });
-                document.querySelectorAll(".rl-outlier-toggle").forEach(function(a) {
-                    a.addEventListener("click", function(e) {
-                        e.preventDefault();
-                        var si = this.dataset.session;
-                        var group = document.querySelector('.rl-outlier-group[data-session="' + si + '"]');
-                        if (group) {
-                            var shown = group.style.display !== "none";
-                            group.style.display = shown ? "none" : "block";
-                            this.innerHTML = this.innerHTML.replace(shown ? "\u203A" : "\u2039", shown ? "\u203A" : "\u2039");
+
+                // Pre-select Lap B: current session, first clean lap that isn't Lap A
+                (function() {
+                    var selBS = document.getElementById("rlSelectBSession");
+                    for (var si = 0; si < rlData.sessions.length; si++) {
+                        if (rlData.sessions[si].is_current) {
+                            selBS.value = String(si);
+                            selBS.dispatchEvent(new Event("change"));
+                            var selA = document.getElementById("rlSelectA");
+                            var selB = document.getElementById("rlSelectB");
+                            for (var i = 1; i < selB.options.length; i++) {
+                                if (selB.options[i].value !== selA.value) {
+                                    selB.value = selB.options[i].value;
+                                    break;
+                                }
+                            }
+                            break;
                         }
-                    });
-                });
-
+                    }
+                })();
                 renderRaceline();
             })();
             {% endif %}
@@ -740,6 +875,7 @@
 
     <!-- Section 4: Where to Improve -->
     {% if sector_data or charts.corner_time_loss or charts.braking_consistency %}
+    <div class="tab-pane fade" id="tab-improve" role="tabpanel" aria-labelledby="improve-tab">
     <h3 class="section-title">Where to Improve</h3>
     <p class="section-desc">The corner time loss chart ranks which corners cost you the most. Wide braking boxes mean inconsistent braking — an easy area to improve. Sector times show where within a lap you can gain time.</p>
 
@@ -798,12 +934,46 @@
         </div>
     </div>
     {% endif %}
+    </div><!-- /tab-improve -->
     {% endif %}
+
+    </div><!-- /tab-content -->
 
     <footer class="text-center text-muted py-4">
         <small>Generated {{ summary.generated }}</small>
     </footer>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function() {
+    // Resize Plotly charts and maps when a tab becomes visible
+    var tabs = document.getElementById('dashboardTabs');
+    if (!tabs) return;
+    tabs.addEventListener('shown.bs.tab', function(event) {
+        var targetPane = document.querySelector(event.target.dataset.bsTarget);
+        if (!targetPane) return;
+        // Resize all Plotly charts in the newly shown tab
+        var plotlyDivs = targetPane.querySelectorAll('.js-plotly-plot');
+        plotlyDivs.forEach(function(div) {
+            Plotly.Plots.resize(div);
+        });
+        // Trigger resize for MapKit maps (they listen for window resize)
+        setTimeout(function() {
+            window.dispatchEvent(new Event('resize'));
+        }, 100);
+        // Update URL hash
+        history.replaceState(null, null, event.target.dataset.bsTarget);
+    });
+    // Activate tab from URL hash on load
+    var hash = window.location.hash;
+    if (hash) {
+        var tabBtn = tabs.querySelector('button[data-bs-target="' + hash + '"]');
+        if (tabBtn) {
+            var tab = new bootstrap.Tab(tabBtn);
+            tab.show();
+        }
+    }
+})();
+</script>
 </body>
 </html>

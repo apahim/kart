@@ -43,6 +43,19 @@ def create_braking_track_map(df, best_lap=None, weather=None, track_corners=None
     }
 
 
+def create_all_laps_braking_map(df, clean_laps, weather=None, track_corners=None):
+    """Generate braking track map data for each clean lap.
+
+    Returns dict {lap_number: map_data_dict}.
+    """
+    result = {}
+    for lap in clean_laps:
+        data = create_braking_track_map(df, best_lap=lap, weather=weather, track_corners=track_corners)
+        if data is not None:
+            result[lap] = data
+    return result
+
+
 def create_braking_consistency_chart(df, laptimes_df=None, time_col="seconds", track_corners=None):
     """Box plot of braking point distance per corner across all laps.
 

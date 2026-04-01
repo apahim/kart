@@ -22,15 +22,24 @@ from scripts.analysis.laptimes import (
     create_laptime_bar_chart,
     create_delta_to_best_chart,
 )
-from scripts.analysis.track_map import create_speed_track_map, create_sector_delta_map, create_lateral_g_track_map
+from scripts.analysis.track_map import (
+    create_speed_track_map, create_sector_delta_map, create_lateral_g_track_map,
+    create_all_laps_speed_map, create_all_laps_sector_delta_map,
+)
 from scripts.analysis.speed import (
     create_cumulative_time_delta,
     create_throttle_brake_phases,
+    create_all_laps_cumulative_delta,
+    create_all_laps_throttle_brake,
 )
 from scripts.analysis.corners import (
     create_corner_time_loss_chart,
 )
-from scripts.analysis.braking import create_braking_track_map, create_braking_consistency_chart
+from scripts.analysis.braking import (
+    create_braking_track_map, create_braking_consistency_chart,
+    create_all_laps_braking_map,
+)
+from scripts.analysis.outliers import detect_outliers
 from scripts.analysis.sectors import create_sector_times_table
 from scripts.analysis.coaching import generate_coaching_summary
 from scripts.analysis.evolution import prepare_raceline_data
@@ -105,30 +114,75 @@ def main(race_dir):
     if track_corners:
         print(f"Using {len(track_corners)} track-defined corners for {track_name}")
 
-    # Map data (rendered by MapKit JS in the template)
+    # Non-deep-dive charts that still need telemetry
     maps = {}
     if telemetry_df is not None:
-        maps["speed_track_map"] = safe_map_data("speed_track_map", create_speed_track_map, telemetry_df, best_lap=best_lap, weather=weather, track_corners=track_corners)
-        maps["braking_map"] = safe_map_data("braking_map", create_braking_track_map, telemetry_df, best_lap=best_lap, weather=weather, track_corners=track_corners)
-
-
-        # Non-map Plotly charts
         charts["braking_consistency"] = safe_chart("braking_consistency", create_braking_consistency_chart, telemetry_df, laptimes_df, track_corners=track_corners)
-        charts["cumulative_delta"] = safe_chart("cumulative_delta", create_cumulative_time_delta, telemetry_df, laptimes_df, track_corners=track_corners)
         charts["corner_time_loss"] = safe_chart("corner_time_loss", create_corner_time_loss_chart, telemetry_df, laptimes_df, track_corners=track_corners)
-        charts["throttle_brake_phases"] = safe_chart("throttle_brake_phases", create_throttle_brake_phases, telemetry_df, laptimes_df)
         try:
             sector_data = create_sector_times_table(telemetry_df, laptimes_df, metadata=metadata, track_corners=track_corners)
         except Exception as e:
             print(f"Warning: sector_times failed: {e}")
             sector_data = None
 
-    if sector_data:
-        maps["sector_delta_map"] = safe_map_data(
-            "sector_delta_map", create_sector_delta_map,
-            telemetry_df, best_lap, sector_data,
-            weather=weather, track_corners=track_corners,
-        )
+    # Build per-lap deep dive data
+    lap_deep_dive = None
+    if telemetry_df is not None:
+        clean_df, _ = detect_outliers(laptimes_df)
+        clean_laps = sorted(clean_df["lap"].astype(int).tolist())
+        best_lap_num = best_lap
+
+        # Build lap list for the dropdown
+        lap_list = []
+        for _, row in clean_df.sort_values("lap").iterrows():
+            lap_num = int(row["lap"])
+            lap_list.append({
+                "lap": lap_num,
+                "time_fmt": format_laptime(row["seconds"]),
+                "is_best": lap_num == best_lap_num,
+            })
+
+        try:
+            speed_maps = create_all_laps_speed_map(telemetry_df, clean_laps, weather=weather, track_corners=track_corners)
+        except Exception as e:
+            print(f"Warning: all-laps speed maps failed: {e}")
+            speed_maps = {}
+
+        try:
+            braking_maps = create_all_laps_braking_map(telemetry_df, clean_laps, weather=weather, track_corners=track_corners)
+        except Exception as e:
+            print(f"Warning: all-laps braking maps failed: {e}")
+            braking_maps = {}
+
+        try:
+            sector_maps = create_all_laps_sector_delta_map(telemetry_df, clean_laps, sector_data, weather=weather, track_corners=track_corners) if sector_data else {}
+        except Exception as e:
+            print(f"Warning: all-laps sector maps failed: {e}")
+            sector_maps = {}
+
+        try:
+            cumulative_delta = create_all_laps_cumulative_delta(telemetry_df, laptimes_df, clean_laps, track_corners=track_corners)
+        except Exception as e:
+            print(f"Warning: all-laps cumulative delta failed: {e}")
+            cumulative_delta = {}
+
+        try:
+            throttle_brake = create_all_laps_throttle_brake(telemetry_df, laptimes_df, clean_laps)
+        except Exception as e:
+            print(f"Warning: all-laps throttle/brake failed: {e}")
+            throttle_brake = {}
+
+        # Convert int keys to strings for JSON compatibility
+        lap_deep_dive = {
+            "laps": lap_list,
+            "best_lap": best_lap_num,
+            "speed_maps": {str(k): v for k, v in speed_maps.items()},
+            "braking_maps": {str(k): v for k, v in braking_maps.items()},
+            "sector_maps": {str(k): v for k, v in sector_maps.items()},
+            "cumulative_delta": {str(k): v for k, v in cumulative_delta.items()},
+            "throttle_brake": {str(k): v for k, v in throttle_brake.items()},
+        }
+        print(f"Lap deep dive: {len(clean_laps)} laps, {len(speed_maps)} speed maps, {len(cumulative_delta)} delta charts")
 
     # Coaching summary / action plan
     coaching = None
@@ -167,6 +221,7 @@ def main(race_dir):
         coaching=coaching,
         sector_data=sector_data,
         raceline_data=raceline_data,
+        lap_deep_dive=lap_deep_dive,
     )
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

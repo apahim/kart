@@ -130,11 +130,15 @@ def create_speed_traces(df, laptimes_df=None, time_col="seconds", track_corners=
     return fig
 
 
-def compute_time_delta(df, laptimes_df, time_col="seconds", n_points=500, track_corners=None):
-    """Compute cumulative time delta between best and median laps.
+def compute_time_delta(df, laptimes_df, time_col="seconds", n_points=500, track_corners=None, target_lap=None):
+    """Compute cumulative time delta between a target lap and the median lap.
 
-    Returns (dist_grid, cum_delta, best_lap, median_lap, corners_info) or None.
-    cum_delta is positive where median is slower (best gained time).
+    Args:
+        target_lap: Lap number to compare against the median. If None, uses
+                    the best (fastest) clean lap.
+
+    Returns (dist_grid, cum_delta, target_lap, median_lap, corners_info) or None.
+    cum_delta is positive where median is slower (target gained time).
     """
     speed_col = "speed_gps" if "speed_gps" in df.columns else "speed"
     if speed_col not in df.columns or "lap_number" not in df.columns:
@@ -148,7 +152,9 @@ def compute_time_delta(df, laptimes_df, time_col="seconds", n_points=500, track_
     if len(clean_df) < 2:
         return None
 
-    best_lap = int(clean_df.loc[clean_df[time_col].idxmin(), "lap"])
+    if target_lap is None:
+        target_lap = int(clean_df.loc[clean_df[time_col].idxmin(), "lap"])
+    best_lap = target_lap
     median_time = clean_df[time_col].median()
     median_lap = int(clean_df.iloc[(clean_df[time_col] - median_time).abs().argsort().iloc[0]]["lap"])
 
@@ -195,9 +201,9 @@ def compute_time_delta(df, laptimes_df, time_col="seconds", n_points=500, track_
     return dist_grid, cum_delta, best_lap, median_lap, corners_info
 
 
-def create_cumulative_time_delta(df, laptimes_df=None, time_col="seconds", track_corners=None):
-    """Cumulative time delta chart: best lap vs median lap."""
-    result = compute_time_delta(df, laptimes_df, time_col=time_col, track_corners=track_corners)
+def create_cumulative_time_delta(df, laptimes_df=None, time_col="seconds", track_corners=None, target_lap=None):
+    """Cumulative time delta chart: target lap vs median lap."""
+    result = compute_time_delta(df, laptimes_df, time_col=time_col, track_corners=track_corners, target_lap=target_lap)
     if result is None:
         return None
 
@@ -251,8 +257,12 @@ def create_cumulative_time_delta(df, laptimes_df=None, time_col="seconds", track
     return fig
 
 
-def create_throttle_brake_phases(df, laptimes_df=None, time_col="seconds"):
-    """Best lap speed trace with throttle/brake/coast phase coloring from longitudinal_acc."""
+def create_throttle_brake_phases(df, laptimes_df=None, time_col="seconds", target_lap=None):
+    """Speed trace with throttle/brake/coast phase coloring from longitudinal_acc.
+
+    Args:
+        target_lap: Lap number to display. If None, uses the best (fastest) clean lap.
+    """
     if "longitudinal_acc" not in df.columns:
         return None
 
@@ -268,7 +278,7 @@ def create_throttle_brake_phases(df, laptimes_df=None, time_col="seconds"):
     if len(clean_df) < 1:
         return None
 
-    best_lap = int(clean_df.loc[clean_df[time_col].idxmin(), "lap"])
+    best_lap = target_lap if target_lap is not None else int(clean_df.loc[clean_df[time_col].idxmin(), "lap"])
     lap_data = df[df["lap_number"] == best_lap].copy().reset_index(drop=True)
     if len(lap_data) < 20:
         return None
@@ -471,3 +481,36 @@ def create_best_vs_comparison_speed(df, laptimes_df=None, time_col="seconds", tr
     fig.update_yaxes(title_text="Delta (km/h)", row=2, col=1)
 
     return fig
+
+
+def create_all_laps_cumulative_delta(df, laptimes_df, clean_laps, time_col="seconds", track_corners=None):
+    """Generate cumulative time delta Plotly JSON for each clean lap.
+
+    Returns dict {lap_number: plotly_json_dict} for use with Plotly.react().
+    """
+    from scripts.analysis.utils import fig_to_json
+
+    result = {}
+    for lap in clean_laps:
+        fig = create_cumulative_time_delta(df, laptimes_df, time_col=time_col,
+                                           track_corners=track_corners, target_lap=lap)
+        data = fig_to_json(fig)
+        if data is not None:
+            result[lap] = data
+    return result
+
+
+def create_all_laps_throttle_brake(df, laptimes_df, clean_laps, time_col="seconds"):
+    """Generate throttle/brake phases Plotly JSON for each clean lap.
+
+    Returns dict {lap_number: plotly_json_dict} for use with Plotly.react().
+    """
+    from scripts.analysis.utils import fig_to_json
+
+    result = {}
+    for lap in clean_laps:
+        fig = create_throttle_brake_phases(df, laptimes_df, time_col=time_col, target_lap=lap)
+        data = fig_to_json(fig)
+        if data is not None:
+            result[lap] = data
+    return result
