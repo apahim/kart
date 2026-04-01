@@ -260,9 +260,6 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="d-flex align-items-end" style="padding-bottom: 2px;">
-                <button id="rlSwapBtn" class="btn btn-sm btn-outline-secondary" title="Swap A and B" style="font-size: 0.75rem;" disabled>&#8644;</button>
-            </div>
             <div style="min-width: 0; flex: 2 1 280px;">
                 <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem; color: #3b82f6;">Lap B</label>
                 <div class="d-flex flex-column flex-sm-row gap-1">
@@ -763,12 +760,6 @@
                         deltaEl.innerHTML = "";
                     }
 
-                    // Swap button: only enabled when Lap B is from the current session
-                    var selB = document.getElementById("rlSelectB");
-                    var swapBtn = document.getElementById("rlSwapBtn");
-                    var bSessionVal = document.getElementById("rlSelectBSession").value;
-                    var bIsCurrent = bSessionVal !== "" && rlData.sessions[parseInt(bSessionVal)] && rlData.sessions[parseInt(bSessionVal)].is_current;
-                    swapBtn.disabled = !selB.value || !bIsCurrent;
 
                     var slider = document.getElementById("rlTimeline");
                     slider.max = animMaxTime > 0 ? animMaxTime.toFixed(1) : "100";
@@ -833,16 +824,6 @@
                         selB.appendChild(opt);
                     });
                     selB.disabled = false;
-                    renderRaceline();
-                });
-
-                // Swap A and B (only when B is from current session)
-                document.getElementById("rlSwapBtn").addEventListener("click", function() {
-                    var selA = document.getElementById("rlSelectA");
-                    var selB = document.getElementById("rlSelectB");
-                    var tmp = selA.value;
-                    selA.value = selB.value;
-                    selB.value = tmp;
                     renderRaceline();
                 });
 
