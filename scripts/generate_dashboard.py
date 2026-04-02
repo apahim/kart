@@ -42,6 +42,7 @@ from scripts.analysis.braking import (
 from scripts.analysis.outliers import detect_outliers
 from scripts.analysis.sectors import create_sector_times_table
 from scripts.analysis.coaching import generate_coaching_summary
+from scripts.analysis.corner_model import build_corner_analysis, build_corner_map_data, corner_analysis_to_template
 from scripts.analysis.evolution import prepare_raceline_data
 from scripts.apple_token import load_mapkit_token
 
@@ -113,6 +114,22 @@ def main(race_dir):
         track_corners = auto_detect_corners(track_name)
     if track_corners:
         print(f"Using {len(track_corners)} track-defined corners for {track_name}")
+
+    # Build unified corner analysis
+    corner_analysis = None
+    corner_analysis_raw = None
+    if telemetry_df is not None:
+        try:
+            corner_analysis_raw = build_corner_analysis(
+                telemetry_df, laptimes_df, track_corners=track_corners
+            )
+            corner_analysis = corner_analysis_to_template(corner_analysis_raw, laptimes_df=laptimes_df)
+            if corner_analysis:
+                corner_map = build_corner_map_data(telemetry_df, corner_analysis_raw)
+                corner_analysis["map_data"] = corner_map
+                print(f"Corner analysis: {len(corner_analysis['summary_rows'])} corners, {len(corner_analysis['lap_breakdowns'])} laps")
+        except Exception as e:
+            print(f"Warning: corner analysis failed: {e}")
 
     # Non-deep-dive charts that still need telemetry
     maps = {}
@@ -191,6 +208,7 @@ def main(race_dir):
             telemetry_df, laptimes_df,
             sector_data=sector_data,
             track_corners=track_corners,
+            corner_analysis=corner_analysis_raw,
         )
     except Exception as e:
         print(f"Warning: coaching summary failed: {e}")
@@ -222,6 +240,7 @@ def main(race_dir):
         sector_data=sector_data,
         raceline_data=raceline_data,
         lap_deep_dive=lap_deep_dive,
+        corner_analysis=corner_analysis,
     )
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

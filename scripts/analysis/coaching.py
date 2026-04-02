@@ -126,8 +126,13 @@ def compute_braking_spread(df, laptimes_df, time_col="seconds", track_corners=No
 
 
 def generate_coaching_summary(df, laptimes_df, corner_scores=None, time_col="seconds",
-                              sector_data=None, track_corners=None):
+                              sector_data=None, track_corners=None, corner_analysis=None):
     """Generate structured action plan with corner-specific advice.
+
+    Args:
+        corner_analysis: Optional pre-built corner analysis dict from
+            build_corner_analysis(). When provided, skips redundant
+            corner time loss and braking spread computation.
 
     Returns dict with:
         - action_items: list of dicts with 'icon', 'title', 'detail'
@@ -145,18 +150,37 @@ def generate_coaching_summary(df, laptimes_df, corner_scores=None, time_col="sec
 
     # --- Top priority corner (from time loss data) ---
     corner_time_loss = None
-    if df is not None and laptimes_df is not None:
-        try:
-            corner_time_loss = compute_corner_time_loss(df, laptimes_df, time_col=time_col, track_corners=track_corners)
-        except Exception:
-            pass
-
     braking_spread = None
-    if df is not None and laptimes_df is not None:
-        try:
-            braking_spread = compute_braking_spread(df, laptimes_df, time_col=time_col, track_corners=track_corners)
-        except Exception:
-            pass
+
+    if corner_analysis is not None:
+        # Extract from pre-built Corner Object
+        corner_time_loss = [
+            {"label": s.corner_name, "delta": -s.avg_time_loss}
+            for s in corner_analysis["summaries"]
+            if s.avg_time_loss != 0
+        ]
+        corner_time_loss.sort(key=lambda x: x["delta"])
+
+        braking_spread = [
+            {"label": s.corner_name, "spread_m": s.braking_spread}
+            for s in corner_analysis["summaries"]
+            if s.braking_spread is not None
+        ]
+        braking_spread.sort(key=lambda x: x["spread_m"], reverse=True)
+        if not braking_spread:
+            braking_spread = None
+    else:
+        if df is not None and laptimes_df is not None:
+            try:
+                corner_time_loss = compute_corner_time_loss(df, laptimes_df, time_col=time_col, track_corners=track_corners)
+            except Exception:
+                pass
+
+        if df is not None and laptimes_df is not None:
+            try:
+                braking_spread = compute_braking_spread(df, laptimes_df, time_col=time_col, track_corners=track_corners)
+            except Exception:
+                pass
 
     if corner_time_loss:
         # Worst corner (most negative delta = most time lost)

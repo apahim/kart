@@ -117,6 +117,11 @@
             <button class="nav-link" id="raceline-tab" data-bs-toggle="tab" data-bs-target="#tab-raceline" type="button" role="tab" aria-controls="tab-raceline" aria-selected="false">Racing Line</button>
         </li>
         {% endif %}
+        {% if corner_analysis %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="corners-tab" data-bs-toggle="tab" data-bs-target="#tab-corners" type="button" role="tab" aria-controls="tab-corners" aria-selected="false">Corner Analysis</button>
+        </li>
+        {% endif %}
         {% if sector_data or charts.corner_time_loss or charts.braking_consistency %}
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="improve-tab" data-bs-toggle="tab" data-bs-target="#tab-improve" type="button" role="tab" aria-controls="tab-improve" aria-selected="false">Where to Improve</button>
@@ -849,9 +854,180 @@
                 renderRaceline();
             })();
             {% endif %}
+
+            /* ===== Corner Analysis Map ===== */
+            {% if corner_analysis and corner_analysis.map_data %}
+            (function() {
+                var cornerMapData = {{ corner_analysis.map_data | tojson }};
+                // DOM element is below this script block; poll until it exists
+                function tryInit() {
+                    if (document.getElementById("cornerMap")) {
+                        setupTrackMap("cornerMap", "cornerCanvas", "cornerMapWrap", cornerMapData);
+                    } else {
+                        setTimeout(tryInit, 100);
+                    }
+                }
+                tryInit();
+            })();
+            {% endif %}
         });
     })();
     </script>
+    {% endif %}
+
+    <!-- Section: Corner Analysis -->
+    {% if corner_analysis %}
+    <div class="tab-pane fade" id="tab-corners" role="tabpanel" aria-labelledby="corners-tab">
+    <h3 class="section-title">Corner Analysis</h3>
+    <p class="section-desc">Each corner as a performance unit — ranked by time loss with root cause classification and corner archetypes.</p>
+
+    <!-- Corner Map -->
+    {% if corner_analysis.map_data and mapkit_token %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card p-2">
+                <div class="mapkit-wrap" id="cornerMapWrap" style="height: 450px;">
+                    <div class="mk-map" id="cornerMap"></div>
+                    <canvas id="cornerCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Corner Ranking Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-2">
+                <h6 class="card-title text-center mb-2">Corner Ranking (Worst First)</h6>
+                <div class="table-responsive">
+                <table class="table table-sm table-hover text-center mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Corner</th>
+                            <th>Type</th>
+                            <th>Avg Time Loss</th>
+                            <th>Best Min Speed</th>
+                            <th>Avg Min Speed</th>
+                            <th>Consistency</th>
+                            <th>Braking Spread</th>
+                            <th>Main Issue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in corner_analysis.summary_rows %}
+                        <tr>
+                            <td class="fw-bold">{{ row.corner }}</td>
+                            <td>
+                                {% if row.archetype == "entry-dependent" %}
+                                <span class="badge bg-danger">Entry</span>
+                                {% elif row.archetype == "exit-dependent" %}
+                                <span class="badge bg-success">Exit</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Flow</span>
+                                {% endif %}
+                            </td>
+                            <td class="{% if row.avg_time_loss > 0.05 %}text-danger fw-bold{% elif row.avg_time_loss < -0.02 %}text-success{% endif %}">
+                                {{ row.avg_time_loss_fmt }}
+                            </td>
+                            <td>{{ row.best_min_speed }} km/h</td>
+                            <td>{{ row.avg_min_speed }} km/h</td>
+                            <td>{{ row.std_min_speed }} km/h</td>
+                            <td>{{ row.braking_spread_fmt }}</td>
+                            <td>
+                                {% if row.dominant_root_cause == "entry" %}
+                                <span class="badge" style="background-color: #e67e22;">Entry</span>
+                                {% elif row.dominant_root_cause == "mid" %}
+                                <span class="badge" style="background-color: #f1c40f; color: #333;">Mid</span>
+                                {% elif row.dominant_root_cause == "exit" %}
+                                <span class="badge" style="background-color: #3498db;">Exit</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-Lap Breakdown -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card p-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h6 class="card-title mb-0">Lap Time Attribution</h6>
+                    <select id="cornerLapSelect" class="form-select form-select-sm" style="width: auto;">
+                        {% for lap_info in corner_analysis.laps %}
+                        <option value="{{ lap_info.lap }}"{% if lap_info.is_best %} selected{% endif %}>
+                            Lap {{ lap_info.lap }}{% if lap_info.time_fmt %} &mdash; {{ lap_info.time_fmt }}{% endif %}{% if lap_info.is_best %} (Best){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% for lap_key, rows in corner_analysis.lap_breakdowns | dictsort %}
+                <div class="corner-lap-breakdown" id="corner-lap-{{ lap_key }}" style="{% if lap_key != corner_analysis.best_lap | string %}display: none;{% endif %}">
+                    <div class="table-responsive">
+                    <table class="table table-sm table-hover text-center mb-0" style="font-size: 0.85rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Corner</th>
+                                <th>Time Loss</th>
+                                <th>Root Cause</th>
+                                <th>Entry</th>
+                                <th>Min Speed</th>
+                                <th>Exit</th>
+                                <th>Braking Dist</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in rows %}
+                            <tr class="{% if r.is_worst %}table-danger{% endif %}">
+                                <td class="fw-bold">{{ r.corner }}</td>
+                                <td class="{% if r.time_loss > 0.05 %}text-danger fw-bold{% elif r.time_loss < -0.02 %}text-success{% endif %}">
+                                    {{ r.time_loss_fmt }}
+                                </td>
+                                <td>
+                                    {% if r.root_cause == "entry" %}
+                                    <span class="badge" style="background-color: #e67e22;">Entry</span>
+                                    {% elif r.root_cause == "mid" %}
+                                    <span class="badge" style="background-color: #f1c40f; color: #333;">Mid</span>
+                                    {% elif r.root_cause == "exit" %}
+                                    <span class="badge" style="background-color: #3498db;">Exit</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ r.entry_speed }} km/h</td>
+                                <td>{{ r.min_speed }} km/h</td>
+                                <td>{{ r.exit_speed }} km/h</td>
+                                <td>{% if r.braking_distance is not none %}{{ r.braking_distance }}m{% else %}-{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <script>
+    (function() {
+        var select = document.getElementById('cornerLapSelect');
+        if (!select) return;
+        select.addEventListener('change', function() {
+            var panels = document.querySelectorAll('.corner-lap-breakdown');
+            panels.forEach(function(p) { p.style.display = 'none'; });
+            var target = document.getElementById('corner-lap-' + this.value);
+            if (target) target.style.display = '';
+        });
+    })();
+    </script>
+    </div><!-- /tab-corners -->
     {% endif %}
 
     <!-- Section 4: Where to Improve -->
